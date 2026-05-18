@@ -85,7 +85,7 @@ HTTP Server (/v1/*) ───────┘   ContextManager → Transcript API
 ## Current Status
 
 - Version: `1.0.0` (source of truth: `.version`)
-- Tests: 599 unit + 253 integration
+- Tests: 599 unit + 257 integration
 - Distribution: homebrew-core (`brew install apfel`), nixpkgs (`nix profile install nixpkgs#apfel-llm`), and the Arthur-Ficial/homebrew-tap
 - Stability policy: [STABILITY.md](STABILITY.md)
 - Security policy: [SECURITY.md](SECURITY.md)
@@ -102,7 +102,7 @@ swift run apfel-tests          # unit tests only (599 tests)
 make preflight                 # full release qualification (unit + integration + policy checks)
 ```
 
-`make test` builds the release binary, runs all 599 unit tests, starts test servers, runs all 253 integration tests, and cleans up. This is the single command for development.
+`make test` builds the release binary, runs all 599 unit tests, starts test servers, runs all 257 integration tests, and cleans up. This is the single command for development.
 
 `make install` auto-unlinks Homebrew apfel so the dev binary takes PATH priority. `make uninstall` restores the Homebrew link.
 
@@ -131,7 +131,7 @@ bash scripts/generate-examples.sh          # ~2 minutes, overwrites docs/EXAMPLE
 | Security | `Sources/Core/OriginValidator.swift`, `Sources/SecurityMiddleware.swift` |
 | MCP client | `Sources/Core/MCPProtocol.swift`, `Sources/MCPClient.swift` |
 | MCP calculator | `mcp/calculator/server.py` |
-| Tests | `Tests/apfelTests/` (599 unit), `Tests/integration/` (253 integration) |
+| Tests | `Tests/apfelTests/` (599 unit), `Tests/integration/` (257 integration) |
 
 | Docs | `docs/` (brew-install, EXAMPLES, release, tool-calling-guide) |
 | Scripts | `scripts/generate-examples.sh`, `scripts/write-homebrew-formula.sh`, `scripts/release-preflight.sh`, `scripts/post-release-verify.sh` |
@@ -374,7 +374,7 @@ apfel ships through three channels. All pull the same signed tarball from each G
 
 **What runs the full suite (local, before every release):**
 - `make preflight` or `make release` on a Mac with Apple Intelligence
-- 599 unit + 253 integration = 852 tests, 0 skipped
+- 599 unit + 257 integration = 856 tests, 0 skipped
 - Release scripts use directory discovery (`Tests/integration/`), not explicit file lists
 - This is the REAL qualification gate. GitHub CI is a safety net, not the source of truth.
 

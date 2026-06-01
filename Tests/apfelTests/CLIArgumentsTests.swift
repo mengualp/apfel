@@ -588,11 +588,15 @@ func runCLIArgumentsTests() {
         try assertTrue(args.quiet)
     }
 
-    test("--retry 0 rejected (falls back to default 3)") {
-        let args = try CLIArguments.parse(["--retry", "0", "hi"])
-        try assertTrue(args.retryEnabled)
-        try assertEqual(args.retryCount, 3)
-        try assertEqual(args.prompt, "0 hi")
+    test("--retry 0 throws (non-positive count rejected, like other numeric flags) (#177)") {
+        // Pre-#177 this silently fell back to 3 and folded "0" into the prompt.
+        // #177 makes a non-positive --retry value a hard error, matching --port etc.
+        do {
+            _ = try CLIArguments.parse(["--retry", "0", "hi"])
+            throw TestFailure("expected CLIParseError for --retry 0")
+        } catch let e as CLIParseError {
+            try assertTrue(e.message.contains("--retry"))
+        }
     }
 
     // ========================================================================

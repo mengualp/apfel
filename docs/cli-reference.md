@@ -26,7 +26,8 @@ OUTPUT
   --no-color                              Disable ANSI colors
 
 MODEL
-  --temperature <n>                       Sampling temperature (e.g., 0.7)
+  --temperature <n>                       Sampling temperature (e.g., 0.7); 0 = deterministic
+  --top-p <n>                             Nucleus sampling threshold in (0, 1] (e.g., 0.9)
   --seed <n>                              Random seed for reproducibility
   --max-tokens <n>                        Maximum response tokens
   --permissive                            Relaxed guardrails (reduces false positives)
@@ -92,6 +93,9 @@ NO_COLOR=1 apfel "Hello"
 # --temperature
 apfel --temperature 0.0 "What is 2+2?"
 apfel --temperature 1.5 "Write a wild poem"
+
+# --top-p
+apfel --top-p 0.9 "Write a short poem"
 
 # --seed
 apfel --seed 42 "Tell me a joke"

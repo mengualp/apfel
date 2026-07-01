@@ -90,6 +90,7 @@ suite("ModelAvailabilityTests") { runModelAvailabilityTests() }
 suite("CLIErrorsTests") { runCLIErrorsTests() }
 suite("CLIValidateTests") { runCLIValidateTests() }
 suite("SchemaParserTests") { runSchemaParserTests() }
+suite("LRUCacheTests") { runLRUCacheTests() }
 suite("FinishReasonResolverTests") { runFinishReasonResolverTests() }
 suite("StreamErrorResolverTests") { runStreamErrorResolverTests() }
 suite("StreamingToolCallGateTests") { runStreamingToolCallGateTests() }

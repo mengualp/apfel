@@ -7,6 +7,10 @@ and this project adheres to [https://semver.org/](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The tool-schema conversion cache (`SchemaConversionCache`) is now a bounded LRU: when full it evicts only the single least-recently-used entry instead of wiping all 64. Previously the 65th distinct tool set flushed the entire cache, so two alternating clients each with more than 32 distinct tool sets caused pathological full-cache churn. Backed by a new pure `LRUCache` in ApfelCore with unit coverage of eviction and the hot-entry-survives property (#247).
+
 ### Fixed
 
 - A `response_format: json_schema` property typed `{"type":"number"}` can now produce fractional values (e.g. `{"price": 9.99}`, `{"temperature": 0.7}`). The schema IR previously conflated JSON Schema `integer` and `number` into one case that mapped to `Int`, so fractional outputs were silently unreachable under schema-guided structured output. The IR now has distinct `.integer` (-> `Int`) and `.number` (-> `Double`) cases (#243).

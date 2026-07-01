@@ -37,18 +37,17 @@ enum SchemaConverter {
 
     private actor SchemaConversionCache {
         static let shared = SchemaConversionCache()
-        private let maxEntries = 64
-        private var entries: [[ToolSignature]: CachedSchemaConversion] = [:]
+        // Bounded LRU: at capacity, evict only the least-recently-used entry
+        // instead of wiping all 64. A full flush let two alternating clients,
+        // each with >32 distinct tool sets, churn the whole cache repeatedly (#247).
+        private var cache = LRUCache<[ToolSignature], CachedSchemaConversion>(capacity: 64)
 
         func value(for key: [ToolSignature]) -> CachedSchemaConversion? {
-            entries[key]
+            cache.value(forKey: key)
         }
 
         func insert(_ value: CachedSchemaConversion, for key: [ToolSignature]) {
-            if entries.count >= maxEntries {
-                entries.removeAll(keepingCapacity: true)
-            }
-            entries[key] = value
+            cache.insert(value, forKey: key)
         }
     }
 

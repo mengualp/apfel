@@ -197,6 +197,31 @@ func runChatRequestValidatorTests() {
         )
     }
 
+    test("validator rejects empty string content in last user message (#233)") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":""}]}"#
+        )
+        try assertEqual(ChatRequestValidator.validate(request), .emptyLastMessageContent)
+    }
+
+    test("validator rejects null content in last user message (#233)") {
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"user","content":null}]}"#
+        )
+        try assertEqual(ChatRequestValidator.validate(request), .emptyLastMessageContent)
+    }
+
+    test("validator allows tool last message with empty content (#233)") {
+        // Tool-role final messages use a synthetic prompt, so empty content is fine.
+        let request = try decode(
+            ChatCompletionRequest.self,
+            from: #"{"model":"\#(M)","messages":[{"role":"tool","tool_call_id":"c1","name":"x","content":""}]}"#
+        )
+        try assertNil(ChatRequestValidator.validate(request))
+    }
+
     test("validator rejects max_tokens <= 0") {
         let request = try decode(
             ChatCompletionRequest.self,

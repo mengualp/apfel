@@ -75,6 +75,8 @@ public enum ChatRequestValidationFailure: Sendable, Equatable, Hashable, CustomS
     case unsupportedParameter(UnsupportedChatParameter)
     /// The final message role was not `user` or `tool`.
     case invalidLastRole
+    /// The final non-tool message had empty or null content.
+    case emptyLastMessageContent
     /// The request included image content.
     case imageContent
     /// A numeric or string parameter had an invalid value.
@@ -91,6 +93,8 @@ public enum ChatRequestValidationFailure: Sendable, Equatable, Hashable, CustomS
             return parameter.message
         case .invalidLastRole:
             return "Last message must have role 'user' or 'tool'"
+        case .emptyLastMessageContent:
+            return "The last message must have non-empty 'content'"
         case .imageContent:
             return "Image content is not supported by the Apple on-device model"
         case .invalidParameterValue(let detail):
@@ -109,6 +113,8 @@ public enum ChatRequestValidationFailure: Sendable, Equatable, Hashable, CustomS
             return "validation failed: unsupported parameter \(parameter.name)"
         case .invalidLastRole:
             return "validation failed: last role != user/tool"
+        case .emptyLastMessageContent:
+            return "validation failed: empty last message content"
         case .imageContent:
             return "rejected: image content"
         case .invalidParameterValue(let detail):
@@ -150,6 +156,17 @@ public enum ChatRequestValidator {
 
         if request.messages.contains(where: \.containsImageContent) {
             return .imageContent
+        }
+
+        // A non-tool final message (last role is guaranteed user/tool here) must
+        // carry non-empty text. Empty or null content is a client-input error,
+        // not a server fault: without this check it surfaces downstream as a 500
+        // ("Last message has no text content") instead of a 400 (#233).
+        if let last = request.messages.last, last.role != "tool" {
+            let text = last.textContent
+            if text == nil || text?.isEmpty == true {
+                return .emptyLastMessageContent
+            }
         }
 
         if let maxTokens = request.max_tokens, maxTokens <= 0 {

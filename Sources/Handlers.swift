@@ -227,6 +227,7 @@ func handleChatCompletion(_ request: Request, context: some RequestContext) asyn
                                        id: requestId, created: created,
                                        genOpts: genOpts, promptTokens: promptTokens,
                                        includeUsage: includeUsage, jsonMode: jsonMode,
+                                       hasTools: !(chatRequest.tools?.isEmpty ?? true),
                                        requestBody: requestBodyString, events: events)
         return (result.response, result.trace)
     } else {
@@ -500,6 +501,7 @@ private func streamingResponse(
     promptTokens: Int,
     includeUsage: Bool,
     jsonMode: Bool,
+    hasTools: Bool,
     requestBody: String?,
     events: [String]
 ) -> (response: Response, trace: ChatRequestTrace) {
@@ -540,41 +542,65 @@ private func streamingResponse(
             let stream = session.streamResponse(to: prompt, options: genOpts)
             var prev = ""
             var chunkCount = 0
+            // Chars already streamed as content deltas. Tracked explicitly (not
+            // via prev.count) because the tool-call gate may buffer some prefix
+            // before flushing (#224).
+            var emittedContentCount = 0
+            // While tools are in play, hold back content that could still be a
+            // tool call so we never leak raw tool-call JSON as content (#224).
+            var toolGateHolding = hasTools
 
             do {
                 for try await snapshot in stream {
                     let content = snapshot.content
-                    if content.count > prev.count {
-                        // In json_object mode we cannot fence-strip an incremental
-                        // suffix (the closing ``` only arrives at the end), so we
-                        // buffer the whole response and emit one stripped delta
-                        // after the loop (#223), mirroring the structured path.
-                        if !jsonMode {
-                            let idx = content.index(content.startIndex, offsetBy: prev.count)
-                            let delta = String(content[idx...])
-                            let chunkLine = sseDataLine(sseContentChunk(id: id, created: created, content: delta, includeUsage: includeUsage))
-                            responseLines?.append(chunkLine.trimmingCharacters(in: .whitespacesAndNewlines))
-                            continuation.yield(ByteBuffer(string: chunkLine))
-                            chunkCount += 1
-                            await eventBox.append("chunk #\(chunkCount) delta=\(delta.count) total=\(content.count)")
-                        }
-                    }
+                    guard content.count > prev.count else { prev = content; continue }
                     prev = content
+
+                    // In json_object mode we cannot fence-strip an incremental
+                    // suffix (the closing ``` only arrives at the end), so we
+                    // buffer the whole response and emit one stripped delta after
+                    // the loop (#223), mirroring the structured path.
+                    if jsonMode { continue }
+
+                    if toolGateHolding {
+                        // Keep buffering while the accumulated content could still
+                        // become a tool call. Once it diverges, flush everything so
+                        // far and resume normal streaming (#224).
+                        if StreamingToolCallGate.isPlausibleToolCallPrefix(content) { continue }
+                        toolGateHolding = false
+                    }
+
+                    let idx = content.index(content.startIndex, offsetBy: emittedContentCount)
+                    let delta = String(content[idx...])
+                    let chunkLine = sseDataLine(sseContentChunk(id: id, created: created, content: delta, includeUsage: includeUsage))
+                    responseLines?.append(chunkLine.trimmingCharacters(in: .whitespacesAndNewlines))
+                    continuation.yield(ByteBuffer(string: chunkLine))
+                    emittedContentCount = content.count
+                    chunkCount += 1
+                    await eventBox.append("chunk #\(chunkCount) delta=\(delta.count) total=\(content.count)")
                 }
 
                 // Check accumulated response for tool calls before emitting final chunk
                 let toolCalls = ToolCallHandler.detectToolCall(in: prev)
 
-                // json_object mode delivers one fence-stripped content delta so the
-                // concatenated stream is valid JSON (#223). Skip when the buffered
-                // output is actually a tool call (handled by the branch below).
+                // Deliver any content buffered but not yet streamed:
+                //  - json_object mode buffered the whole response; emit it once,
+                //    fence-stripped, so the concatenation is valid JSON (#223).
+                //  - the tool-call gate held a response that turned out NOT to be
+                //    a tool call; flush it as content now (#224).
+                // Skip entirely when the buffered output IS a tool call (handled
+                // by the tool_calls branch below).
                 let deliveredContent: String
-                if jsonMode, toolCalls == nil {
-                    deliveredContent = JSONFenceStripper.strip(prev)
-                    let contentLine = sseDataLine(sseContentChunk(id: id, created: created, content: deliveredContent, includeUsage: includeUsage))
-                    responseLines?.append(contentLine.trimmingCharacters(in: .whitespacesAndNewlines))
-                    continuation.yield(ByteBuffer(string: contentLine))
-                    await eventBox.append("json_object content delta chars=\(deliveredContent.count)")
+                if toolCalls == nil, jsonMode || emittedContentCount < prev.count {
+                    deliveredContent = jsonMode
+                        ? JSONFenceStripper.strip(prev)
+                        : String(prev[prev.index(prev.startIndex, offsetBy: emittedContentCount)...])
+                    if !deliveredContent.isEmpty {
+                        let contentLine = sseDataLine(sseContentChunk(id: id, created: created, content: deliveredContent, includeUsage: includeUsage))
+                        responseLines?.append(contentLine.trimmingCharacters(in: .whitespacesAndNewlines))
+                        continuation.yield(ByteBuffer(string: contentLine))
+                        await eventBox.append("buffered content delta chars=\(deliveredContent.count)")
+                    }
                 } else {
                     deliveredContent = prev
                 }
@@ -598,12 +624,15 @@ private func streamingResponse(
                             function: call.function
                         )
                     }
+                    // OpenAI parity (#224): the tool_calls arrive in their own
+                    // chunk with finish_reason=null, then a SEPARATE empty-delta
+                    // chunk carries finish_reason. Never bundle the two.
                     let toolChunk = ChatCompletionChunk(
                         id: id, object: "chat.completion.chunk", created: created, model: modelName,
                         choices: [.init(
                             index: 0,
                             delta: .init(role: nil, content: nil, tool_calls: chunkToolCalls),
-                            finish_reason: finishReason,
+                            finish_reason: nil,
                             logprobs: nil
                         )],
                         usage: nil,
@@ -612,6 +641,16 @@ private func streamingResponse(
                     let toolLine = sseDataLine(toolChunk)
                     responseLines?.append(toolLine.trimmingCharacters(in: .whitespacesAndNewlines))
                     continuation.yield(ByteBuffer(string: toolLine))
+
+                    let toolFinishChunk = ChatCompletionChunk(
+                        id: id, object: "chat.completion.chunk", created: created, model: modelName,
+                        choices: [.init(index: 0, delta: .init(role: nil, content: nil, tool_calls: nil), finish_reason: finishReason, logprobs: nil)],
+                        usage: nil,
+                        includeUsageNull: includeUsage
+                    )
+                    let toolFinishLine = sseDataLine(toolFinishChunk)
+                    responseLines?.append(toolFinishLine.trimmingCharacters(in: .whitespacesAndNewlines))
+                    continuation.yield(ByteBuffer(string: toolFinishLine))
                     await eventBox.append("tool_calls detected: \(calls.map(\.name).joined(separator: ", "))")
                 } else {
                     let stopChunk = ChatCompletionChunk(

@@ -92,6 +92,7 @@ suite("CLIValidateTests") { runCLIValidateTests() }
 suite("SchemaParserTests") { runSchemaParserTests() }
 suite("FinishReasonResolverTests") { runFinishReasonResolverTests() }
 suite("StreamErrorResolverTests") { runStreamErrorResolverTests() }
+suite("StreamingToolCallGateTests") { runStreamingToolCallGateTests() }
 suite("ToolResolutionTests") { runToolResolutionTests() }
 suite("BodyLimitsTests") { runBodyLimitsTests() }
 suite("TokenBudgetTests") { runTokenBudgetTests() }

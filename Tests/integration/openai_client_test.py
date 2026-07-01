@@ -201,6 +201,76 @@ def test_tool_round_trip_tool_last():
     assert data["choices"][0]["message"]["content"] is not None
 
 
+def test_streaming_tool_call_no_content_leak():
+    """stream=True with client tools: the client must NEVER receive the raw
+    tool-call JSON as content deltas, and finish_reason must ride in a chunk
+    SEPARATE from the tool_calls delta (OpenAI parity).
+
+    Regression guard for #224: the streaming path forwarded every model delta as
+    delta.content, so clients saw `{"tool_calls":[{"id":"call_1"...` as assistant
+    text and then a tool_calls chunk that also bundled finish_reason.
+    """
+    tools = [{
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get the current weather for a city",
+            "parameters": {
+                "type": "object",
+                "properties": {"city": {"type": "string"}},
+                "required": ["city"],
+            },
+        },
+    }]
+    content = ""
+    tool_call_chunks = []           # chunks whose delta carries tool_calls
+    finish_reasons = []             # (has_tool_calls, finish_reason) per chunk
+    with httpx.stream(
+        "POST",
+        "http://localhost:11434/v1/chat/completions",
+        json={
+            "model": MODEL,
+            "messages": [{"role": "user", "content": "Use the provided weather function for Vienna. Do not answer directly."}],
+            "tools": tools,
+            "tool_choice": {"type": "function", "function": {"name": "get_weather"}},
+            "seed": 1,
+            "stream": True,
+        },
+        timeout=60,
+    ) as resp:
+        for line in resp.iter_lines():
+            if not line.startswith("data: "):
+                continue
+            data = line[6:]
+            if data.strip() == "[DONE]":
+                break
+            chunk = json.loads(data)
+            if not chunk["choices"]:
+                continue
+            delta = chunk["choices"][0]["delta"]
+            fr = chunk["choices"][0]["finish_reason"]
+            if delta.get("content"):
+                content += delta["content"]
+            if delta.get("tool_calls"):
+                tool_call_chunks.append(chunk)
+                # The tool_calls delta chunk itself must NOT carry finish_reason.
+                assert fr is None, \
+                    f"tool_calls delta chunk must not bundle finish_reason; got {fr!r}"
+            finish_reasons.append((bool(delta.get("tool_calls")), fr))
+
+    # No raw tool-call JSON must have been streamed as content.
+    assert "tool_calls" not in content, \
+        f"raw tool_calls JSON leaked as content deltas: {content!r}"
+    # A proper tool_calls delta must have been emitted.
+    assert tool_call_chunks, "no tool_calls delta chunk was emitted"
+    tc = tool_call_chunks[0]["choices"][0]["delta"]["tool_calls"][0]
+    assert tc["function"]["name"] == "get_weather"
+    # finish_reason=tool_calls must arrive in a SEPARATE chunk with no tool_calls.
+    tool_calls_finish = [fr for has_tc, fr in finish_reasons if fr == "tool_calls" and not has_tc]
+    assert tool_calls_finish, \
+        "finish_reason=tool_calls must arrive in its own empty-delta chunk"
+
+
 # MARK: - JSON Mode
 
 def test_json_mode():

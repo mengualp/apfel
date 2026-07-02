@@ -12,21 +12,38 @@ actor TokenCounter {
     static let shared = TokenCounter()
     private let model = SystemLanguageModel.default
 
+    /// True when any count call in this process actually fell back to chars/4
+    /// at runtime - tokenCount(for:) threw, or availability flipped after the
+    /// pre-flight `tokenCountFallback` check said the real API was usable.
+    /// Callers that report accuracy (--count-tokens) reset this before their
+    /// counts and read it after, so `approximate` reflects what actually
+    /// happened rather than a prediction (#327).
+    private(set) var runtimeFellBack = false
+
+    func resetRuntimeFallbackFlag() {
+        runtimeFellBack = false
+    }
+
+    private func fallback(_ text: String) -> Int {
+        runtimeFellBack = true
+        return max(1, text.count / 4)
+    }
+
     /// Count tokens in text using the real FoundationModels API.
     /// Falls back to chars/4 approximation on error or when the model is unavailable.
     func count(_ text: String) async -> Int {
         guard !text.isEmpty else { return 0 }
         guard isAvailable else {
-            return max(1, text.count / 4)
+            return fallback(text)
         }
         if #available(macOS 26.4, *) {
             do {
                 return try await model.tokenCount(for: text)
             } catch {
-                return max(1, text.count / 4)
+                return fallback(text)
             }
         } else {
-            return max(1, text.count / 4)
+            return fallback(text)
         }
     }
 
@@ -139,6 +156,7 @@ actor TokenCounter {
     }
 
     private func fallbackCount(entries: [Transcript.Entry]) -> Int {
+        runtimeFellBack = true
         var total = 0
         for entry in entries {
             switch entry {

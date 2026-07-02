@@ -91,12 +91,19 @@ func countTokens(
     let outputReserve = options.contextConfig.outputReserve
     let contextSize = await TokenCounter.shared.contextSize
     let tokenCountFallback = await TokenCounter.shared.tokenCountFallback
+    await TokenCounter.shared.resetRuntimeFallbackFlag()
     let approximate = tokenCountFallback != nil
+    // Session/entry construction is only unsafe when the MODEL is unavailable.
+    // Under .osTooOld generation works fine: entries are built normally and
+    // counted via the chars/4 fallback, which prices tool definitions too -
+    // so MCP tool schemas are not silently counted as 0 and --strict cannot
+    // false-pass on macOS < 26.4 (#326).
+    let modelUnavailable = tokenCountFallback == .modelUnavailable
 
     let inputEntries: [Transcript.Entry]
     let noToolEntries: [Transcript.Entry]?
 
-    if approximate {
+    if modelUnavailable {
         // Avoid LanguageModelSession construction when the model is unavailable.
         inputEntries = []
         noToolEntries = nil
@@ -120,7 +127,7 @@ func countTokens(
     }
 
     let total: Int
-    if approximate {
+    if modelUnavailable {
         var approxTotal = await TokenCounter.shared.count(mergedPrompt)
         if let sys = systemPrompt, !sys.isEmpty {
             approxTotal += await TokenCounter.shared.count(sys)
@@ -150,7 +157,7 @@ func countTokens(
     }
 
     let mcpToolTokens: Int
-    if approximate {
+    if modelUnavailable {
         mcpToolTokens = 0
     } else if let baseline = noToolEntries {
         let baselineCount = await TokenCounter.shared.count(entries: baseline)
@@ -158,6 +165,13 @@ func countTokens(
     } else {
         mcpToolTokens = 0
     }
+
+    // The pre-flight decision can be wrong at runtime: tokenCount(for:) can
+    // throw, or availability can flip between the check and the counts. The
+    // counter records any actual fallback so the report never claims exact
+    // numbers that were really chars/4 (#327).
+    let runtimeFellBack = await TokenCounter.shared.runtimeFellBack
+    let fellBackAtRuntime = tokenCountFallback == nil && runtimeFellBack
 
     let report = TokenBudgetReport.make(
         promptTokens: promptTokens,
@@ -167,11 +181,13 @@ func countTokens(
         total: total,
         contextSize: contextSize,
         outputReserve: outputReserve,
-        approximate: approximate
+        approximate: approximate || fellBackAtRuntime
     )
 
     if let tokenCountFallback, !quietMode {
         printStderr("\(styledErr("apfel:", .yellow)) \(tokenCountFallback.message)")
+    } else if fellBackAtRuntime, !quietMode {
+        printStderr("\(styledErr("apfel:", .yellow)) token count is approximate (the on-device tokenizer failed at runtime; using chars/4 fallback)")
     }
 
     switch outputFormat {

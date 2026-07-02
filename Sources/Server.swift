@@ -255,6 +255,13 @@ func startServer(config: ServerConfig, mcpManager: MCPManager? = nil) async thro
         bannerLines.append("\(styled("├", .dim)) \(styled(headline, .red, .bold))")
         bannerLines.append("\(styled("├", .dim)) \(styled("Any website can access this server and read responses!", .red))")
     }
+    // Non-loopback bind with no token = zero authentication for every host that
+    // can reach the socket. Warn as loudly as the footgun warning; do not refuse
+    // to bind (that would be a breaking behavior change) (#228).
+    if ServerSecurity.shouldWarnExposedWithoutToken(host: config.host, hasToken: config.token != nil) {
+        bannerLines.append("\(styled("├", .dim)) \(styled("WARNING: bound to \(config.host) with NO token - unauthenticated access from any host that can reach this machine!", .red, .bold))")
+        bannerLines.append("\(styled("├", .dim)) \(styled("Set a token: --token <secret> or --token-auto. See docs/server-security.md", .red))")
+    }
     bannerLines.append("\(styled("└", .dim)) ready")
     printStderr(bannerLines.joined(separator: "\n"))
 
@@ -281,12 +288,8 @@ func startServer(config: ServerConfig, mcpManager: MCPManager? = nil) async thro
 }
 
 func isLoopbackHost(_ host: String) -> Bool {
-    switch host.lowercased() {
-    case "127.0.0.1", "localhost", "::1", "[::1]":
-        return true
-    default:
-        return false
-    }
+    // Single source of truth lives in ApfelCore so it is unit-testable (#228).
+    ServerSecurity.isLoopbackHost(host)
 }
 
 // MARK: - Query Parameter Parsing

@@ -80,6 +80,7 @@ suite("OpenAIModelsTests") { runOpenAIModelsTests() }
 suite("JSONFenceStripperTests") { runJSONFenceStripperTests() }
 suite("ChatRequestValidatorTests") { runChatRequestValidatorTests() }
 suite("OriginValidatorTests") { runOriginValidatorTests() }
+suite("ServerSecurityTests") { runServerSecurityTests() }
 suite("MCPClientTests") { runMCPClientTests() }
 suite("MCPToolRegistryTests") { runMCPToolRegistryTests() }
 suite("ToolOutputTruncatorTests") { runToolOutputTruncatorTests() }

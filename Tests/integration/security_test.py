@@ -352,6 +352,32 @@ def test_default_server_has_no_origin_warning():
     assert "Any website can access this server" not in banner
 
 
+def test_non_loopback_bind_without_token_warns_loudly():
+    """0.0.0.0 with no token must fire a loud red banner pointing at --token (#228)."""
+    with running_server(bind_host="0.0.0.0") as (_, log_path):
+        banner = read_log(log_path)
+    assert "WARNING" in banner
+    assert "NO token" in banner
+    assert "--token" in banner
+    assert "docs/server-security.md" in banner
+
+
+def test_non_loopback_bind_with_token_has_no_exposure_warning():
+    """0.0.0.0 WITH a token must not print the exposed-without-token warning (#228)."""
+    with running_server(
+        "--token", "secret123", bind_host="0.0.0.0", ready_statuses=(401,)
+    ) as (_, log_path):
+        banner = read_log(log_path)
+    assert "NO token" not in banner
+
+
+def test_loopback_bind_without_token_has_no_exposure_warning():
+    """Default loopback bind without a token must not print the #228 warning."""
+    with running_server() as (_, log_path):
+        banner = read_log(log_path)
+    assert "NO token" not in banner
+
+
 def test_unauthorized_error_keeps_cors_for_allowed_origin():
     """Allowed browser origins must receive ACAO on 401 so auth failures are readable."""
     with running_server(

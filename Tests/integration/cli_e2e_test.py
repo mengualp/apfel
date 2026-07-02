@@ -6,7 +6,8 @@ Exercises the release binary as a real UNIX tool:
 - ANSI vs NO_COLOR under a TTY
 - direct prompt, piped stdin, streaming, and quiet JSON output
 
-Run via Tests/integration/run_tests.sh after the release binary has been built.
+Run via `make test` (or `python3 -m pytest Tests/integration/`) after the
+release binary has been built.
 """
 
 import functools

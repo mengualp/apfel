@@ -151,6 +151,76 @@ def running_mcp_servers(mcp_scripts):
                 proc.wait(timeout=5)
 
 
+@contextlib.contextmanager
+def running_mcp_server_with_env(mcp_script, extra_env):
+    """Start apfel --serve --mcp <script> with extra env vars; yield read_log.
+
+    Used to prove the local MCP subprocess env is scrubbed (#229): the parent
+    apfel process is given secrets, and the fixture reflects what it could see
+    through its tool names, which apfel prints on the startup banner.
+    """
+    import os as _os
+
+    port = find_free_port()
+    env = _os.environ.copy()
+    env.update(extra_env)
+    with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8") as log_file:
+        proc = subprocess.Popen(
+            [str(BINARY), "--serve", "--port", str(port), "--mcp", str(mcp_script)],
+            stdout=log_file,
+            stderr=log_file,
+            text=True,
+            env=env,
+        )
+        base_url = f"http://127.0.0.1:{port}"
+
+        def read_log():
+            log_file.flush()
+            with open(log_file.name, "r", encoding="utf-8") as fh:
+                return fh.read()
+
+        try:
+            wait_for_server(base_url)
+            yield read_log
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=5)
+
+
+def test_local_mcp_subprocess_env_is_scrubbed():
+    """Local MCP scripts must not inherit apfel/secret env vars (#229).
+
+    Model-free: only exercises initialize + tools/list. The fixture names a
+    ``leaked_*`` tool for every canary secret it can still see and a ``saw_*``
+    tool for every allowlisted passthrough var; apfel prints the tool names on
+    startup, so the banner reveals exactly what crossed the boundary.
+    """
+    secrets = {
+        "APFEL_TOKEN": "server-secret-xyz",
+        "APFEL_MCP_TOKEN": "mcp-secret-xyz",
+        "TEST_CANARY_SECRET": "leak-secret",
+        "TEST_CANARY_API_KEY": "leak-key",
+        "TEST_CANARY_TOKEN": "leak-token",
+        "PYTHONPATH": "/tmp/pythonpath-canary",
+    }
+    with running_mcp_server_with_env(
+        FIXTURES / "env_echo_mcp_server.py", secrets
+    ) as read_log:
+        banner = read_log()
+    # The fixture ran (handshake + tools/list succeeded).
+    assert "env_report" in banner
+    # No secret crossed into the child.
+    assert "leaked_" not in banner, banner
+    # Allowlisted PYTHON var still passed through so venv/FastMCP servers work.
+    assert "saw_pythonpath" in banner
+    # Baseline vars the child needs are present.
+    assert "saw_path" in banner
+
+
 # ============================================================================
 # Module-scoped fixtures -- each makes ONE LLM call, shared across tests
 # ============================================================================

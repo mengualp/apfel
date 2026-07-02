@@ -48,4 +48,67 @@ func runServerSecurityTests() {
     test("exposed warning: LAN bind without token warns") {
         try assertTrue(ServerSecurity.shouldWarnExposedWithoutToken(host: "192.168.1.10", hasToken: false))
     }
+
+    // MARK: - scrubbedMCPEnvironment (#229)
+
+    let dirtyEnv: [String: String] = [
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "HOME": "/Users/tester",
+        "TMPDIR": "/var/folders/xy/tmp/",
+        "LANG": "en_US.UTF-8",
+        "LC_ALL": "en_US.UTF-8",
+        "PYTHONPATH": "/opt/pp",
+        "PYTHONHOME": "/opt/py",
+        "VIRTUAL_ENV": "/opt/venv",
+        "APFEL_TOKEN": "server-secret",
+        "APFEL_MCP_TOKEN": "mcp-secret",
+        "APFEL_HOST": "0.0.0.0",
+        "AWS_SECRET_ACCESS_KEY": "leak",
+        "OPENAI_API_KEY": "leak",
+        "MY_ACCESS_TOKEN": "leak",
+        "GITHUB_TOKEN": "leak",
+        "RANDOM_UNRELATED_VAR": "value",
+    ]
+
+    test("scrub: APFEL_ vars are excluded") {
+        let scrubbed = ServerSecurity.scrubbedMCPEnvironment(from: dirtyEnv)
+        try assertNil(scrubbed["APFEL_TOKEN"])
+        try assertNil(scrubbed["APFEL_MCP_TOKEN"])
+        try assertNil(scrubbed["APFEL_HOST"])
+    }
+
+    test("scrub: TOKEN/KEY/SECRET vars are excluded") {
+        let scrubbed = ServerSecurity.scrubbedMCPEnvironment(from: dirtyEnv)
+        try assertNil(scrubbed["AWS_SECRET_ACCESS_KEY"])
+        try assertNil(scrubbed["OPENAI_API_KEY"])
+        try assertNil(scrubbed["MY_ACCESS_TOKEN"])
+        try assertNil(scrubbed["GITHUB_TOKEN"])
+    }
+
+    test("scrub: unrelated vars not on the allowlist are excluded") {
+        let scrubbed = ServerSecurity.scrubbedMCPEnvironment(from: dirtyEnv)
+        try assertNil(scrubbed["RANDOM_UNRELATED_VAR"])
+    }
+
+    test("scrub: PATH/HOME/TMPDIR/LANG pass through") {
+        let scrubbed = ServerSecurity.scrubbedMCPEnvironment(from: dirtyEnv)
+        try assertEqual(scrubbed["PATH"], "/usr/local/bin:/usr/bin:/bin")
+        try assertEqual(scrubbed["HOME"], "/Users/tester")
+        try assertEqual(scrubbed["TMPDIR"], "/var/folders/xy/tmp/")
+        try assertEqual(scrubbed["LANG"], "en_US.UTF-8")
+    }
+
+    test("scrub: LC_* and PYTHON*/VIRTUAL_ENV pass through") {
+        let scrubbed = ServerSecurity.scrubbedMCPEnvironment(from: dirtyEnv)
+        try assertEqual(scrubbed["LC_ALL"], "en_US.UTF-8")
+        try assertEqual(scrubbed["PYTHONPATH"], "/opt/pp")
+        try assertEqual(scrubbed["PYTHONHOME"], "/opt/py")
+        try assertEqual(scrubbed["VIRTUAL_ENV"], "/opt/venv")
+    }
+
+    test("scrub: PATH is synthesized when the parent has none") {
+        let scrubbed = ServerSecurity.scrubbedMCPEnvironment(from: ["HOME": "/Users/tester"])
+        try assertNotNil(scrubbed["PATH"])
+        try assertTrue(scrubbed["PATH"]!.contains("/usr/bin"))
+    }
 }

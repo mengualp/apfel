@@ -62,6 +62,11 @@ final class MCPConnection: @unchecked Sendable {
         proc.standardInput = stdinP
         proc.standardOutput = stdoutP
         proc.standardError = FileHandle.nullDevice
+        // Scrub the child's environment so a third-party MCP script never
+        // inherits APFEL_TOKEN/APFEL_MCP_TOKEN or any cloud/API keys in the
+        // shell. With environment == nil, Process inherits the full parent env
+        // (#229). The allowlist keeps what python3/FastMCP/venv servers need.
+        proc.environment = ServerSecurity.scrubbedMCPEnvironment(from: ProcessInfo.processInfo.environment)
 
         self.process = proc
         self.stdinPipe = stdinP

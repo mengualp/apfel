@@ -40,6 +40,13 @@ func exitCode(for error: ApfelError) -> Int32 {
 
 apfel_install_sigint_exit_handler(isatty(STDOUT_FILENO) != 0 ? 1 : 0)
 
+// Ignore SIGPIPE process-wide. A crashed MCP server (or any closed pipe/socket
+// peer) must not kill apfel: writes to a dead pipe would otherwise raise SIGPIPE
+// with the default disposition and terminate the process (exit 141), taking down
+// the whole --serve HTTP server. With SIG_IGN the write instead fails with EPIPE,
+// which the throwing write path in MCPClient maps to a recoverable error (#215).
+signal(SIGPIPE, SIG_IGN)
+
 // True when stdin is a FIFO/pipe (`command | apfel`) vs a regular file
 // redirect (`apfel < file`). We only suggest `2>&1` for the pipe case;
 // regular files don't need that advice.

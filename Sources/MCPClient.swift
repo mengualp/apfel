@@ -59,7 +59,7 @@ final class MCPConnection: @unchecked Sendable {
                 operationDescription: "initialize"
             )
             let _ = try MCPProtocol.parseInitializeResponse(initResp)
-            send(MCPProtocol.initializedNotification())
+            try send(MCPProtocol.initializedNotification())
 
             // Discover tools
             let toolsResp = try sendAndReceive(
@@ -115,9 +115,22 @@ final class MCPConnection: @unchecked Sendable {
         return id
     }
 
-    private func send(_ message: String) {
+    private func send(_ message: String) throws {
         guard let data = (message + "\n").data(using: .utf8) else { return }
-        stdinPipe.fileHandleForWriting.write(data)
+        // Guard against writing to a crashed MCP server. Without this a closed
+        // read end raises SIGPIPE (fatal by default) or, with the legacy
+        // non-throwing FileHandle.write(_:), an uncatchable ObjC exception on
+        // EPIPE. The isRunning check catches the common case fast; the throwing
+        // write(contentsOf:) inside do/catch catches the crash-mid-write race
+        // and maps it to a recoverable MCPError (#215).
+        guard process.isRunning else {
+            throw MCPError.processError("MCP server process is not running (\(path))")
+        }
+        do {
+            try stdinPipe.fileHandleForWriting.write(contentsOf: data)
+        } catch {
+            throw MCPError.processError("failed to write to MCP server stdin (\(path)): \(error.localizedDescription)")
+        }
     }
 
     private func sendAndReceive(
@@ -125,7 +138,7 @@ final class MCPConnection: @unchecked Sendable {
         timeoutMilliseconds: Int,
         operationDescription: String
     ) throws -> String {
-        send(message)
+        try send(message)
         return try lineReader.readLine(
             timeoutMilliseconds: timeoutMilliseconds,
             operationDescription: operationDescription

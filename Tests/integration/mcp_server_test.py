@@ -377,6 +377,38 @@ def test_mcp_tool_timeout_returns_structured_error():
     assert "timed out" in message
 
 
+def test_mcp_crashed_server_does_not_kill_apfel():
+    """A crashed MCP server must not take down the whole apfel process (#215).
+
+    crashing_mcp_server.py answers the handshake (so the tool registers and the
+    server is healthy) then exits before any tools/call. When the model then
+    calls the tool, apfel writes to a pipe whose read end is closed. Before the
+    fix that raised SIGPIPE and killed the whole --serve process (exit 141);
+    now the write fails with a recoverable MCPError and the HTTP server stays up.
+    """
+    with running_custom_mcp_server(FIXTURES / "crashing_mcp_server.py") as api_url:
+        base_url = api_url.rsplit("/", 1)[0]
+        # A large product the on-device model will route to the tool rather than
+        # computing in-head, so the write to the dead pipe actually happens.
+        resp = httpx.post(f"{api_url}/chat/completions", json={
+            "model": MODEL,
+            "messages": [
+                {"role": "user", "content": "Use the multiply tool to compute 247 times 83. Reply with just the number."}
+            ],
+            "seed": 42,
+            "max_tokens": 128,
+        }, timeout=30)
+        # The individual request surfaces a structured 500 (the dead pipe write
+        # is a tool-execution failure), not a connection reset.
+        assert resp.status_code == 500, f"Expected 500, got {resp.status_code}: {resp.text[:200]}"
+        data = resp.json()
+        assert data["error"]["type"] == "server_error"
+        # The server must still be alive and serving after the crashed-pipe write.
+        health = httpx.get(f"{base_url}/health", timeout=5)
+        assert health.status_code == 200, "apfel server died after writing to a crashed MCP server (SIGPIPE)"
+        assert health.json()["model_available"] is True
+
+
 # ============================================================================
 # MCP tool routing (different calculator tools)
 # ============================================================================

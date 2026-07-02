@@ -25,6 +25,7 @@ OUTPUT
   -o, --output <fmt>                      Output format: plain, json
   -q, --quiet                             Suppress non-essential output
   --no-color                              Disable ANSI colors
+  --schema <path>                         Constrain output to a JSON Schema file (guaranteed valid JSON)
 
 MODEL
   --temperature <n>                       Sampling temperature (e.g., 0.7); 0 = deterministic
@@ -80,6 +81,10 @@ apfel -s "Reply in JSON only" "List 3 colors"
 
 # --system-file - read system prompt from a file
 apfel --system-file persona.txt "Introduce yourself"
+
+# --schema - guaranteed schema-valid JSON output (single-prompt mode only)
+apfel --schema person.schema.json "Extract the person: Alice is 30 years old."
+apfel --schema invoice.schema.json -f invoice.txt "Extract the invoice data" | jq .total
 
 # --mcp, --mcp-token, --mcp-timeout
 apfel --mcp ./mcp/calculator/server.py "What is 15 times 27?"

@@ -54,6 +54,7 @@ _apfel() {
     '--context-status[Print context fill after each turn]' \
     '-f[Attach file content to prompt]:file:_files' \
     '--file[Attach file content to prompt]:file:_files' \
+    '--schema[Constrain output to a JSON Schema file]:file:_files' \
     '1:command:(completions)' \
     '*:file:_files'
 }

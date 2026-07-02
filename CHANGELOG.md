@@ -7,6 +7,10 @@ and this project adheres to [https://semver.org/](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `--schema <file>`: guaranteed structured output on the UNIX tool surface. The single-shot CLI now accepts a JSON Schema file and constrains generation with FoundationModels guided generation (the same `DynamicGenerationSchema` path the server's `response_format: json_schema` uses since #167), so stdout is always one schema-valid JSON object - no fence stripping, no invalid-JSON retries, jq-ready. Malformed or unsupported schemas fail at argument-parse time with exit 2; `--chat`, `--stream`, `--count-tokens`, and MCP combinations are rejected as usage errors; `-o json` wraps the object as a string in the standard envelope (#361).
+
 ## [1.7.2] - 2026-07-02
 
 ### Fixed

@@ -75,6 +75,42 @@ func singlePrompt(_ prompt: String, systemPrompt: String?, stream: Bool, options
     }
 }
 
+// MARK: - Structured Single Prompt (#361)
+
+/// Handle a single prompt with schema-guaranteed structured output (`--schema`).
+///
+/// The compiled `GenerationSchema` constrains decoding, so the output is
+/// always a schema-valid JSON object - no fence stripping, no retry-on-invalid
+/// JSON. Plain output prints the raw JSON (newline-terminated, jq-ready);
+/// `-o json` wraps it as a string in the standard ApfelResponse envelope.
+func structuredSinglePrompt(
+    _ prompt: String,
+    systemPrompt: String?,
+    schemaJSON: String,
+    schemaName: String,
+    options: SessionOptions = .defaults
+) async throws {
+    let schema = try SchemaConverter.generationSchema(fromJSON: schemaJSON, name: schemaName)
+    let session = makeSession(systemPrompt: systemPrompt, options: options)
+    let genOpts = makeGenerationOptions(options)
+    debugLog("schema", "prompt_length=\(prompt.count) schema_name=\(schemaName)")
+
+    let retryMax = options.retryEnabled ? options.retryCount : 0
+    let content = try await withRetry(maxRetries: retryMax) {
+        try await session.respond(to: prompt, schema: schema, options: genOpts).content.jsonString
+    }
+
+    switch outputFormat {
+    case .plain:
+        print(content)
+    case .json:
+        let obj = ApfelResponse(
+            model: modelName, content: content,
+            metadata: .init(onDevice: true, version: version))
+        print(jsonString(obj))
+    }
+}
+
 // MARK: - Token Budget Preflight
 
 /// Count tokens for a prompt without calling the model (`--count-tokens`).
@@ -661,6 +697,7 @@ func printUsage(to handle: FileHandle = .standardOutput) {
       -f, --file <path>         Attach file content to prompt (repeatable)
       -s, --system <text>       Set a system prompt
           --system-file <path>  Read system prompt from file
+          --schema <path>       Constrain output to a JSON Schema file (guaranteed valid JSON)
       -o, --output <format>     Output format: plain, json [default: plain]
       -q, --quiet               Suppress non-essential output
           --no-color             Disable colored output

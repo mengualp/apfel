@@ -109,6 +109,7 @@ public enum ShellCompletions {
             CompletionFlag(["--context-output-reserve"], .generic, "Tokens reserved for output"),
             CompletionFlag(["--context-status"], .none, "Print context fill after each turn"),
             CompletionFlag(["-f", "--file"], .file, "Attach file content to prompt"),
+            CompletionFlag(["--schema"], .file, "Constrain output to a JSON Schema file"),
         ]
     }
 

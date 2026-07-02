@@ -122,6 +122,7 @@ suite("RedTDDTests") { runRedTDDTests() }
 suite("AsyncSemaphoreTests") { runAsyncSemaphoreTests() }
 suite("ChatHistoryTests") { runChatHistoryTests() }
 suite("CompletionsTests") { runCompletionsTests() }
+suite("SchemaFlagTests") { runSchemaFlagTests() }
 
 // MARK: - Summary
 

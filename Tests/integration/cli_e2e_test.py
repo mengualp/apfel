@@ -1316,3 +1316,104 @@ def test_mcp_child_reaped_on_exit_path():
     if orphans:
         subprocess.run(["pkill", "-f", "eof_ignoring_mcp_server"], capture_output=True)
     assert not orphans, f"MCP child orphaned after exit (#246): pids {orphans}"
+
+
+# ============================================================================
+# --schema: guaranteed structured output on the CLI (#361)
+# ============================================================================
+
+VALID_PERSON_SCHEMA = (
+    '{"type":"object","properties":{"name":{"type":"string"},'
+    '"age":{"type":"integer"}},"required":["name","age"]}'
+)
+
+
+def test_schema_malformed_file_exits_2(tmp_path):
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json")
+    result = run_cli(["--schema", str(bad), "extract"], timeout=30)
+    assert result.returncode == 2, f"expected exit 2, got {result.returncode}: {result.stderr}"
+    assert "schema" in result.stderr.lower()
+
+
+def test_schema_missing_file_exits_2(tmp_path):
+    result = run_cli(["--schema", str(tmp_path / "missing.json"), "extract"], timeout=30)
+    assert result.returncode == 2, f"expected exit 2, got {result.returncode}: {result.stderr}"
+    assert "no such file" in result.stderr.lower()
+
+
+def test_schema_with_chat_exits_2(tmp_path):
+    schema = tmp_path / "s.json"
+    schema.write_text(VALID_PERSON_SCHEMA)
+    result = run_cli(["--schema", str(schema), "--chat"], timeout=30)
+    assert result.returncode == 2, f"expected exit 2, got {result.returncode}: {result.stderr}"
+    assert "--schema" in result.stderr and "--chat" in result.stderr
+
+
+def test_schema_with_stream_exits_2(tmp_path):
+    schema = tmp_path / "s.json"
+    schema.write_text(VALID_PERSON_SCHEMA)
+    result = run_cli(["--schema", str(schema), "--stream", "extract"], timeout=30)
+    assert result.returncode == 2, f"expected exit 2, got {result.returncode}: {result.stderr}"
+    assert "--schema" in result.stderr and "--stream" in result.stderr
+
+
+def test_schema_stdin_dash_exits_2():
+    result = run_cli(["--schema", "-", "extract"], timeout=30)
+    assert result.returncode == 2, f"expected exit 2, got {result.returncode}: {result.stderr}"
+    assert "--schema" in result.stderr and "stdin" in result.stderr
+
+
+def test_schema_listed_in_help():
+    result = run_cli(["--help"], timeout=20)
+    assert result.returncode == 0
+    assert "--schema" in result.stdout
+
+
+@pytest.mark.model
+def test_schema_output_is_schema_valid_json(tmp_path):
+    require_model()
+    schema = tmp_path / "person.schema.json"
+    schema.write_text(VALID_PERSON_SCHEMA)
+    result = run_cli(
+        ["--schema", str(schema), "Extract the person: Alice is 30 years old."],
+        timeout=120,
+    )
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    payload = json.loads(result.stdout)
+    assert isinstance(payload, dict)
+    assert isinstance(payload.get("name"), str) and payload["name"], payload
+    assert isinstance(payload.get("age"), int), payload
+
+
+@pytest.mark.model
+def test_schema_with_json_output_wraps_content(tmp_path):
+    require_model()
+    schema = tmp_path / "person.schema.json"
+    schema.write_text(VALID_PERSON_SCHEMA)
+    result = run_cli(
+        ["-o", "json", "--schema", str(schema),
+         "Extract the person: Bob is 25 years old."],
+        timeout=120,
+    )
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    envelope = json.loads(result.stdout)
+    assert envelope["metadata"]["on_device"] is True
+    inner = json.loads(envelope["content"])
+    assert isinstance(inner.get("name"), str), inner
+    assert isinstance(inner.get("age"), int), inner
+
+
+@pytest.mark.model
+def test_schema_piped_stdin_prompt(tmp_path):
+    require_model()
+    schema = tmp_path / "person.schema.json"
+    schema.write_text(VALID_PERSON_SCHEMA)
+    result = run_cli(
+        ["--schema", str(schema), "Extract the person described in the input."],
+        input_text="Carla is a 41 year old engineer from Vienna.",
+        timeout=120,
+    )
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    payload = json.loads(result.stdout)
+    assert isinstance(payload.get("age"), int), payload

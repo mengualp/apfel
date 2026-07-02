@@ -327,9 +327,18 @@ do {
             await shutdownMCP()
             exit(exitUsageError)
         }
-        // The bare-pipe case (`echo hi | apfel`) streams to preserve its
-        // historical output behavior; an explicit prompt does not (#222).
-        try await singlePrompt(prompt, systemPrompt: parsed.systemPrompt, stream: noArgsPipe, options: sessionOpts, mcpManager: mcpManager)
+        if let schemaJSON = parsed.schemaJSON {
+            // --schema: schema-guaranteed structured output (#361). Validated
+            // at parse time; MCP/stream/chat combinations are rejected there.
+            try await structuredSinglePrompt(
+                prompt, systemPrompt: parsed.systemPrompt,
+                schemaJSON: schemaJSON, schemaName: parsed.schemaName ?? "schema",
+                options: sessionOpts)
+        } else {
+            // The bare-pipe case (`echo hi | apfel`) streams to preserve its
+            // historical output behavior; an explicit prompt does not (#222).
+            try await singlePrompt(prompt, systemPrompt: parsed.systemPrompt, stream: noArgsPipe, options: sessionOpts, mcpManager: mcpManager)
+        }
 
     case .countTokens:
         guard !prompt.isEmpty || parsed.systemPrompt != nil else {

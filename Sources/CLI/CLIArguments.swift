@@ -70,6 +70,15 @@ public struct CLIArguments: Sendable, Equatable {
     /// Exit 4 when over budget (only valid with `--count-tokens`).
     public var strictCount: Bool = false
 
+    /// Raw JSON Schema text from `--schema <file>` (#361). Validated at parse
+    /// time via `SchemaParser` so a malformed schema is a usage error (exit 2),
+    /// never a runtime failure. nil => unconstrained generation.
+    public var schemaJSON: String? = nil
+
+    /// Root name for the generation schema, derived from the `--schema`
+    /// filename stem (see `schemaName(fromPath:)`).
+    public var schemaName: String? = nil
+
     // MARK: - Output
 
     public var outputFormat: OutputFormat? = nil
@@ -144,7 +153,19 @@ public struct CLIArguments: Sendable, Equatable {
         "--context-strategy", "--context-max-turns", "--context-output-reserve",
         "--context-status",
         "-f", "--file",
+        "--schema",
     ]
+
+    /// Derive the generation-schema root name from a `--schema` file path:
+    /// basename, all extensions stripped, non-alphanumerics collapsed to `_`.
+    /// Falls back to "schema" when nothing usable remains.
+    public static func schemaName(fromPath path: String) -> String {
+        let base = (path as NSString).lastPathComponent
+        let stem = String(base.prefix(while: { $0 != "." }))
+        let sanitized = stem.map { $0.isLetter || $0.isNumber ? String($0) : "_" }.joined()
+        let trimmed = sanitized.trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+        return trimmed.isEmpty ? "schema" : trimmed
+    }
 
     /// Whether `token` is a flag the parser knows, ignoring any attached
     /// `=value` (so `--retry=5` counts as the known flag `--retry`).
@@ -214,6 +235,16 @@ extension CLIArguments {
         }
         if strictCount && mode != .countTokens {
             throw CLIParseError("--strict requires --count-tokens")
+        }
+        if schemaJSON != nil {
+            // Guaranteed structured output is a single-prompt feature (#361):
+            // one prompt in, one schema-valid JSON object out.
+            if mode != .single {
+                throw CLIParseError("--schema requires a single one-shot prompt; cannot combine with --\(mode.rawValue)")
+            }
+            if !mcpServerPaths.isEmpty {
+                throw CLIParseError("--schema cannot be combined with MCP tool calling (--mcp / APFEL_MCP)")
+            }
         }
         // Future cross-flag checks live here.
     }
@@ -419,6 +450,34 @@ extension CLIArguments {
                 } catch {
                     throw CLIParseError(fileErrorMessage(path: path))
                 }
+
+            // -- Structured output (#361) --
+
+            case "--schema":
+                i += 1
+                guard i < args.count else { throw CLIErrors.requires("--schema", "a JSON Schema file path") }
+                let schemaPath = args[i]
+                guard schemaPath != "-" else {
+                    throw CLIParseError("--schema does not read from stdin; pass a file path (stdin is reserved for prompt input)")
+                }
+                let schemaText: String
+                do {
+                    schemaText = try readFile(schemaPath)
+                } catch let e as CLIParseError {
+                    throw e
+                } catch {
+                    throw CLIParseError(fileErrorMessage(path: schemaPath))
+                }
+                let name = CLIArguments.schemaName(fromPath: schemaPath)
+                // Validate the schema NOW so a broken file is a usage error
+                // (exit 2) with a precise message, not a runtime failure.
+                do {
+                    _ = try SchemaParser.parse(json: schemaText, name: name)
+                } catch let e as SchemaParser.Error {
+                    throw CLIParseError("invalid JSON schema in \(schemaPath): \(schemaErrorMessage(e))")
+                }
+                result.schemaJSON = schemaText
+                result.schemaName = name
 
             // -- Output --
 
@@ -776,6 +835,20 @@ extension CLIArguments {
             return "unsupported file: \(path) -- apfel -f reads text, PDF, and images (JPEG, PNG, HEIC, TIFF, ...)"
         default:
             return "file is not valid UTF-8 text: \(path) (binary file?)"
+        }
+    }
+
+    /// Human-friendly message for a `--schema` validation failure (#361).
+    static func schemaErrorMessage(_ error: SchemaParser.Error) -> String {
+        switch error {
+        case .invalidJSON:
+            return "not valid JSON"
+        case .unsupportedType(let t):
+            return "unsupported type \"\(t)\" (supported: object, string, integer, number, boolean, array)"
+        case .missingArrayItems:
+            return "array schema is missing \"items\""
+        case .invalidProperty(let p):
+            return "property \"\(p)\" is not a schema object"
         }
     }
 }

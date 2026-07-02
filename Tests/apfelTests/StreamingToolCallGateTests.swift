@@ -1,5 +1,5 @@
 // ============================================================================
-// StreamingToolCallGateTests.swift — Pure decision logic that keeps the
+// StreamingToolCallGateTests.swift - Pure decision logic that keeps the
 // streaming SSE path from leaking raw tool-call JSON as content deltas (#224).
 // ============================================================================
 
@@ -18,7 +18,7 @@ func runStreamingToolCallGateTests() {
         try assertTrue(StreamingToolCallGate.isPlausibleToolCallPrefix("   \n\t "))
     }
 
-    test("single brace holds — could grow into {\"tool_calls\"") {
+    test("single brace holds - could grow into {\"tool_calls\"") {
         try assertTrue(StreamingToolCallGate.isPlausibleToolCallPrefix("{"))
     }
 
@@ -40,7 +40,7 @@ func runStreamingToolCallGateTests() {
         try assertTrue(StreamingToolCallGate.isPlausibleToolCallPrefix("\n  {\"tool_calls\": ["))
     }
 
-    test("partial fence holds — one, two, three backticks") {
+    test("partial fence holds - one, two, three backticks") {
         try assertTrue(StreamingToolCallGate.isPlausibleToolCallPrefix("`"))
         try assertTrue(StreamingToolCallGate.isPlausibleToolCallPrefix("``"))
         try assertTrue(StreamingToolCallGate.isPlausibleToolCallPrefix("```"))

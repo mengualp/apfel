@@ -398,7 +398,7 @@ func runSchemaParserTests() {
             _ = try SchemaParser.parse(json: #"{"anyOf":[{"type":"string"},{"type":"number"}]}"#, name: "bad")
             throw TestFailure("expected throw")
         } catch SchemaParser.Error.unsupportedType {
-            // expected — engages the text-injection fallback (tools) / 400 (json_schema)
+            // expected - engages the text-injection fallback (tools) / 400 (json_schema)
         }
     }
 

@@ -1,5 +1,5 @@
 """
-apfel Integration Tests — regression guards for tickets #167-#183 and #219/#243
+apfel Integration Tests - regression guards for tickets #167-#183 and #219/#243
 
 These began life as the TDD RED batch (branch tdd/red-tests-167-183). Every
 ticket they cover is now FIXED and shipped; the tests are kept as REGRESSION
@@ -311,7 +311,7 @@ def test_182_streaming_retry_prints_output_once():
 
 
 # ---------------------------------------------------------------------------
-# #219 anyOf/oneOf/type-arrays — nullable unions parse, unsupported ones 400
+# #219 anyOf/oneOf/type-arrays - nullable unions parse, unsupported ones 400
 # ---------------------------------------------------------------------------
 
 def test_219_json_schema_unsupported_union_returns_400():

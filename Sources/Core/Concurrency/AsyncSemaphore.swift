@@ -93,5 +93,5 @@ public actor AsyncSemaphore {
 
 public struct SemaphoreTimeoutError: Error, LocalizedError {
     public init() {}
-    public var errorDescription: String? { "Request queued too long — server at max concurrent capacity" }
+    public var errorDescription: String? { "Request queued too long - server at max concurrent capacity" }
 }

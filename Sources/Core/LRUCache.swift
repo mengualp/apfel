@@ -1,6 +1,6 @@
 // ============================================================================
-// LRUCache.swift — Pure bounded least-recently-used cache
-// Part of ApfelCore — no FoundationModels dependency
+// LRUCache.swift - Pure bounded least-recently-used cache
+// Part of ApfelCore - no FoundationModels dependency
 //
 // A minimal fixed-capacity cache that, when full, evicts the single
 // least-recently-used entry instead of wiping everything. Kept deliberately

@@ -83,7 +83,7 @@ done
 
 # Run ALL integration test files — directory discovery, not explicit lists.
 # This ensures new test files are never silently excluded from release qualification.
-# APFEL_REQUIRE_FULL=1: any skipped test fails the release (#227) — a skip means a
+# APFEL_REQUIRE_FULL=1: any skipped test fails the release (#227) - a skip means a
 # feature shipped unverified (the exact green-by-skip hole this closes).
 APFEL_REQUIRE_FULL=1 python3 -m pytest Tests/integration/ -v --tb=short
 

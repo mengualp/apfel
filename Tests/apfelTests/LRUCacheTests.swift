@@ -1,5 +1,5 @@
 // ============================================================================
-// LRUCacheTests.swift — Unit tests for the pure LRUCache (#247)
+// LRUCacheTests.swift - Unit tests for the pure LRUCache (#247)
 // ============================================================================
 
 import Foundation

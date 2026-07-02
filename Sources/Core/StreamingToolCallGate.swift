@@ -1,8 +1,8 @@
 // ============================================================================
-// StreamingToolCallGate.swift — Decide whether streamed content so far could
+// StreamingToolCallGate.swift - Decide whether streamed content so far could
 // still be the beginning of a tool call, so the SSE loop can hold it back
 // instead of leaking raw tool-call JSON as content deltas (#224).
-// Part of ApfelCore — pure Swift, no external dependencies.
+// Part of ApfelCore - pure Swift, no external dependencies.
 // ============================================================================
 
 import Foundation
@@ -12,7 +12,7 @@ import Foundation
 /// never emits tool calls as assistant text). The SSE loop buffers while this
 /// gate reports the accumulated content could still become a tool call, and
 /// flushes it as plain content the moment it diverges from every tool-call
-/// shape — so genuine text answers still stream token-by-token.
+/// shape - so genuine text answers still stream token-by-token.
 public enum StreamingToolCallGate {
 
     /// The bare-JSON tool-call opener the model is instructed to emit
@@ -27,11 +27,11 @@ public enum StreamingToolCallGate {
     ///
     /// Plausible prefixes (per #224): leading whitespace only, or a (partial)
     /// markdown fence, or a (partial) `{"tool_calls"` object opener. Anything
-    /// else — including a JSON object that is clearly not `tool_calls`
-    /// (e.g. `{"answer"`) or ordinary prose — is not held back.
+    /// else - including a JSON object that is clearly not `tool_calls`
+    /// (e.g. `{"answer"`) or ordinary prose - is not held back.
     public static func isPlausibleToolCallPrefix(_ accumulated: String) -> Bool {
         let trimmed = accumulated.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Nothing but whitespace has arrived yet — keep waiting.
+        // Nothing but whitespace has arrived yet - keep waiting.
         if trimmed.isEmpty { return true }
         // A (partial) fence, or a (partial) bare tool-call object.
         return sharesPrefix(trimmed, fenceOpener) || sharesPrefix(trimmed, jsonOpener)

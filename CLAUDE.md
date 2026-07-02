@@ -356,7 +356,7 @@ apfel ships through three channels. All pull the same signed tarball from each G
 
 ## CI / GitHub Actions
 
-**IMPORTANT: GitHub CI runs only a SUBSET of tests.** GitHub-hosted `macos-26` runners are Intel Macs with no Apple Intelligence. Most integration tests need the model and cannot run there.
+**IMPORTANT: GitHub CI runs only a SUBSET of tests.** GitHub-hosted `macos-26` runners are arm64 VMs without Apple Intelligence (the blocker is the virtualized runner, not the CPU architecture). Most integration tests need the model and cannot run there.
 
 **What GitHub CI runs (automatic, every push/PR):**
 - Build (release binary)

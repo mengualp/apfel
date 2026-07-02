@@ -62,7 +62,7 @@ make release TYPE=minor         # minor bump (1.0.x -> 1.1.0)
 make release TYPE=major         # major bump (1.x.y -> 2.0.0)
 ```
 
-This runs locally via `scripts/publish-release.sh` (not on GitHub Actions - GitHub runners are Intel with no Apple Intelligence and cannot run the full test suite).
+This runs locally via `scripts/publish-release.sh` (not on GitHub Actions - GitHub runners are arm64 VMs without Apple Intelligence and cannot run the full test suite).
 
 ## What the release script does
 
@@ -106,7 +106,7 @@ GitHub CI (`ci.yml`) runs on every push/PR as a safety net, but it is a **subset
 - Unit tests that do not need Apple Intelligence
 - Model-free integration checks such as flags, help, version, file handling, man-page drift, and ApfelCore packaging smoke tests
 
-GitHub CI **cannot** run the full integration suite because GitHub-hosted `macos-26` runners are Intel Macs without Apple Intelligence. Full qualification runs locally on a Mac with Apple Intelligence via `make preflight` and `make release`. This local run is the real gate - no release ships without it.
+GitHub CI **cannot** run the full integration suite because GitHub-hosted `macos-26` runners are arm64 VMs without Apple Intelligence. Full qualification runs locally on a Mac with Apple Intelligence via `make preflight` and `make release`. This local run is the real gate - no release ships without it.
 
 ## Distribution channels
 

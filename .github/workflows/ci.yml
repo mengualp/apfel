@@ -40,9 +40,10 @@ jobs:
 
       - name: Integration tests (model-free subset)
         run: |
-          # GitHub-hosted macos-26 runners are Intel with no Apple Intelligence.
-          # We run every test that does NOT need the model. Full integration
-          # qualification runs locally via `make preflight` / `make release`.
+          # GitHub-hosted macos-26 runners are arm64 VMs without Apple
+          # Intelligence (the constraint is the virtualized runner, not the CPU
+          # architecture). We run every test that does NOT need the model. Full
+          # integration qualification runs locally via `make preflight` / `make release`.
 
           # CLI tests: everything NOT marked @pytest.mark.model. A brittle -k
           # name-substring allowlist used to silently drop tests on rename and

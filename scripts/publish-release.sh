@@ -94,20 +94,10 @@ SERVER_PID=""
 MCP_SERVER_PID=""
 trap - EXIT
 
-# --- Commit + tag + push ---
-step "Commit and tag v$version"
-
-# Stamp the accumulated [Unreleased] entries as this version so CHANGELOG.md
-# stays current with every release (#201). Idempotent.
-bash scripts/stamp-changelog.sh "$version"
-
-git add .version README.md Sources/BuildInfo.swift CHANGELOG.md
-git commit -m "release v$version"
-git tag -a "v$version" -m "v$version"
-git push origin HEAD:main
-git push origin "v$version"
-
 # --- Sign the binary (#226) ---
+# Signing and notarization run BEFORE the release commit/tag is pushed: they
+# only need the built binary, and a signing/notarization failure must abort
+# with zero published side effects (no stranded tag, no double version bump).
 # Sign with the Developer ID identity under a hardened runtime BEFORE packaging
 # so the tarred binary is the signed one. Signing lives here (not in
 # package-release-asset) so plain `make build`/dev packaging never touches the
@@ -121,11 +111,6 @@ codesign --force --timestamp --options runtime \
     ".build/release/apfel" \
     || fail "codesign failed - refusing to publish (#226)"
 codesign --verify --strict ".build/release/apfel" || fail "codesign verification failed (#226)"
-
-# --- Package + publish GitHub Release ---
-step "Publish GitHub Release"
-
-asset=$(make package-release-asset | tail -1)
 
 # --- Notarization hard gate (#226) ---
 # Refuse to publish an ad-hoc-signed binary, and notarize the signed binary so
@@ -159,6 +144,24 @@ else
         || { rm -rf "$notarize_dir"; fail "notarization failed - refusing to publish (#226). Ensure the '$NOTARY_PROFILE' keychain profile exists (xcrun notarytool store-credentials) and its keychain is unlocked, or set APFEL_NOTARY_APPLE_ID / APFEL_NOTARY_PASSWORD."; }
 fi
 rm -rf "$notarize_dir"
+
+# --- Commit + tag + push ---
+step "Commit and tag v$version"
+
+# Stamp the accumulated [Unreleased] entries as this version so CHANGELOG.md
+# stays current with every release (#201). Idempotent.
+bash scripts/stamp-changelog.sh "$version"
+
+git add .version README.md Sources/BuildInfo.swift CHANGELOG.md
+git commit -m "release v$version"
+git tag -a "v$version" -m "v$version"
+git push origin HEAD:main
+git push origin "v$version"
+
+# --- Package + publish GitHub Release ---
+step "Publish GitHub Release"
+
+asset=$(make package-release-asset | tail -1)
 
 # Checksum sidecar, published as a second release asset so a swapped tarball is
 # detectable independently of the Homebrew formula (#226).

@@ -81,6 +81,9 @@ final class MCPConnection: @unchecked Sendable {
     }
 
     func callTool(name: String, arguments: String) throws -> String {
+        // Malformed model-emitted arguments must fail loudly instead of being
+        // silently replaced with {} by the request formatter (#241).
+        try MCPProtocol.validateToolArguments(name: name, arguments: arguments)
         // On timeout the manager deregisters and reaps this connection (#216);
         // callTool just surfaces the error.
         let resp = try sendAndReceive(
@@ -222,6 +225,9 @@ actor RemoteMCPConnection: Sendable {
     }
 
     func callTool(name: String, arguments: String) async throws -> String {
+        // Malformed model-emitted arguments must fail loudly instead of being
+        // silently replaced with {} by the request formatter (#241).
+        try MCPProtocol.validateToolArguments(name: name, arguments: arguments)
         let resp = try await post(MCPProtocol.toolsCallRequest(id: allocId(), name: name, arguments: arguments))
         let result = try MCPProtocol.parseToolCallResponse(resp)
         if result.isError {

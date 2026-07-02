@@ -299,6 +299,67 @@ func runMCPClientTests() {
         try assertTrue(formatInstructions.contains("tool_calls"), "format must contain call format")
     }
 
+    // MARK: - Malformed model-emitted arguments must fail loudly (#241)
+    // The formatting fallback in toolsCallRequest silently replaced malformed
+    // JSON with {}; the call sites must validate first and throw a typed error.
+
+    test("validateToolArguments accepts a JSON object") {
+        try MCPProtocol.validateToolArguments(name: "multiply", arguments: "{\"a\":247,\"b\":83}")
+    }
+
+    test("validateToolArguments accepts a JSON array") {
+        try MCPProtocol.validateToolArguments(name: "sum", arguments: "[1,2,3]")
+    }
+
+    test("validateToolArguments accepts empty and whitespace-only arguments") {
+        try MCPProtocol.validateToolArguments(name: "list", arguments: "")
+        try MCPProtocol.validateToolArguments(name: "list", arguments: "  \n")
+    }
+
+    test("validateToolArguments throws typed invalidArguments on truncated JSON") {
+        var thrown: MCPError?
+        do {
+            try MCPProtocol.validateToolArguments(name: "get_weather", arguments: "{\"lat\": 48.2, \"lon\":")
+        } catch let e as MCPError {
+            thrown = e
+        }
+        guard case .invalidArguments(let message)? = thrown else {
+            throw TestFailure("expected MCPError.invalidArguments, got \(String(describing: thrown))")
+        }
+        try assertTrue(message.contains("get_weather"), "message must name the tool: \(message)")
+        try assertTrue(message.contains("not valid JSON"), "message must say the arguments are invalid: \(message)")
+        try assertTrue(message.contains("lat"), "message must include the offending arguments: \(message)")
+    }
+
+    test("validateToolArguments throws typed invalidArguments on unquoted-key JSON") {
+        var thrown: MCPError?
+        do {
+            try MCPProtocol.validateToolArguments(name: "multiply", arguments: "{a: 1, b: 2}")
+        } catch let e as MCPError {
+            thrown = e
+        }
+        guard case .invalidArguments = thrown else {
+            throw TestFailure("expected MCPError.invalidArguments, got \(String(describing: thrown))")
+        }
+    }
+
+    test("validateToolArguments rejects a bare scalar (not an object or array)") {
+        var thrown: MCPError?
+        do {
+            try MCPProtocol.validateToolArguments(name: "multiply", arguments: "42")
+        } catch let e as MCPError {
+            thrown = e
+        }
+        guard case .invalidArguments = thrown else {
+            throw TestFailure("expected MCPError.invalidArguments, got \(String(describing: thrown))")
+        }
+    }
+
+    test("MCPError.invalidArguments description carries the message") {
+        let err = MCPError.invalidArguments("Tool 'x' arguments are not valid JSON")
+        try assertEqual("\(err)", "Tool 'x' arguments are not valid JSON")
+    }
+
     test("Tool call detection works on object-argument format from #144 report") {
         // The #144 reporter showed the model producing arguments as a JSON object
         // (not an escaped string). Detection must handle both forms.

@@ -337,11 +337,15 @@ func detectAndExecuteMCPTools(
             resultParts.append("\(call.name): \(result)")
             toolLog.append((name: call.name, args: call.argumentsString, result: result, isError: false))
         } catch {
-            if case .toolNotFound = error as? MCPError {
+            switch error as? MCPError {
+            // Non-fatal per-call failures: feed them back as an error result so
+            // the model can retry (unknown tool, or malformed model-emitted
+            // arguments (#241)) instead of aborting the whole request.
+            case .toolNotFound, .invalidArguments:
                 let msg = "\(error)"
                 resultParts.append("\(call.name): error - \(msg)")
                 toolLog.append((name: call.name, args: call.argumentsString, result: msg, isError: true))
-            } else {
+            default:
                 throw error
             }
         }

@@ -35,6 +35,10 @@ public enum MCPProtocol {
 
     /// Formats the MCP `tools/call` JSON-RPC request.
     ///
+    /// Call `validateToolArguments(name:arguments:)` first: malformed arguments
+    /// hit the `[:]` formatting fallback here, which must never be reached
+    /// silently with model-emitted input (#241).
+    ///
     /// - Parameters:
     ///   - id: The JSON-RPC request identifier.
     ///   - name: The tool name to invoke.
@@ -45,6 +49,34 @@ public enum MCPProtocol {
             "name": name,
             "arguments": argsObj
         ])
+    }
+
+    /// Validates model-emitted tool-call arguments before they are sent to an
+    /// MCP server.
+    ///
+    /// The model can emit truncated or otherwise malformed JSON arguments.
+    /// Those must fail loudly with a typed error the caller can surface as a
+    /// retryable tool-error result - not be silently replaced with `{}` by the
+    /// formatting fallback in `toolsCallRequest(id:name:arguments:)`, which
+    /// makes an all-optional-params tool "succeed" with defaults (#241).
+    ///
+    /// Empty or whitespace-only arguments are valid (a call with no arguments).
+    ///
+    /// - Parameters:
+    ///   - name: The tool name, used in the error message.
+    ///   - arguments: JSON text describing the tool-call arguments.
+    /// - Throws: `MCPError.invalidArguments` when `arguments` is non-empty and
+    ///   not a JSON object or array.
+    public static func validateToolArguments(name: String, arguments: String) throws {
+        let trimmed = arguments.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        // Default options (no .fragmentsAllowed): a bare scalar is not a valid
+        // MCP arguments payload either.
+        guard (try? JSONSerialization.jsonObject(with: Data(trimmed.utf8))) != nil else {
+            throw MCPError.invalidArguments(
+                "Tool '\(name)' arguments are not valid JSON: \(trimmed.prefix(200))"
+            )
+        }
     }
 
     // MARK: - Response parsing
@@ -157,6 +189,8 @@ public enum MCPProtocol {
 public enum MCPError: Error, Sendable, Equatable {
     /// The server returned malformed or incomplete JSON.
     case invalidResponse(String)
+    /// The model emitted malformed tool-call arguments (#241).
+    case invalidArguments(String)
     /// The remote MCP server returned an application-level error.
     case serverError(String)
     /// The requested tool does not exist.
@@ -173,6 +207,8 @@ extension MCPError: LocalizedError, CustomStringConvertible {
     public var description: String {
         switch self {
         case .invalidResponse(let message):
+            return message
+        case .invalidArguments(let message):
             return message
         case .serverError(let message):
             return message

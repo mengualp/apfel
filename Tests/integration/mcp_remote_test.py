@@ -312,43 +312,49 @@ def test_remote_mcp_response_has_usage(remote_multiply_response):
 
 
 def test_remote_mcp_streaming_tool_auto_execute(apfel_remote_mcp_url):
-    """Streaming SSE chat completions also auto-execute remote MCP tools."""
-    chunks = []
-    finish_reasons = []
-    with httpx.stream(
-        "POST",
-        f"{apfel_remote_mcp_url}/chat/completions",
-        json={
-            "model": MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "Use the multiply tool to compute 247 times 83. Reply with just the number.",
-                }
-            ],
-            "stream": True,
-        },
-        timeout=TIMEOUT,
-    ) as resp:
-        assert resp.status_code == 200, f"HTTP {resp.status_code}: {resp.text[:200]}"
-        for line in resp.iter_lines():
-            if line.startswith("data: ") and line != "data: [DONE]":
-                try:
-                    data = json.loads(line[6:])
-                    choices = data.get("choices") or []
-                    if choices:
-                        fr = choices[0].get("finish_reason")
-                        if fr:
-                            finish_reasons.append(fr)
-                        delta = choices[0].get("delta", {}).get("content", "")
-                        if delta:
-                            chunks.append(delta)
-                except (json.JSONDecodeError, KeyError, IndexError):
-                    pass
-    content = "".join(chunks)
+    """Streaming SSE chat completions also auto-execute remote MCP tools.
+
+    Unseeded model trajectory: the model occasionally passes bad arguments to
+    the tool, gets the isError result fed back (#220), and apologizes instead
+    of answering ("It seems there was an error in the multiplication tool.") -
+    observed blocking a release at preflight. Retry a few attempts before
+    failing, per the #324 hardening policy."""
+    content = ""
+    for _ in range(3):
+        chunks = []
+        with httpx.stream(
+            "POST",
+            f"{apfel_remote_mcp_url}/chat/completions",
+            json={
+                "model": MODEL,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Use the multiply tool to compute 247 times 83. Reply with just the number.",
+                    }
+                ],
+                "stream": True,
+            },
+            timeout=TIMEOUT,
+        ) as resp:
+            assert resp.status_code == 200, f"HTTP {resp.status_code}: {resp.text[:200]}"
+            for line in resp.iter_lines():
+                if line.startswith("data: ") and line != "data: [DONE]":
+                    try:
+                        data = json.loads(line[6:])
+                        choices = data.get("choices") or []
+                        if choices:
+                            delta = choices[0].get("delta", {}).get("content", "")
+                            if delta:
+                                chunks.append(delta)
+                    except (json.JSONDecodeError, KeyError, IndexError):
+                        pass
+        content = "".join(chunks)
+        if "20501" in content or "20,501" in content:
+            return
     assert content, "No content in streaming response"
-    assert "20501" in content or "20,501" in content, (
-        f"Expected '20501' (247*83) in streamed response: {content}"
+    assert False, (
+        f"Expected '20501' (247*83) in streamed response after 3 attempts: {content}"
     )
 
 

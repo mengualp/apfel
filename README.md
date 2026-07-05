@@ -145,65 +145,23 @@ Ctrl-C exits. Context is trimmed automatically ([docs/context-strategies.md](doc
 
 ## Demos
 
-Real-world shell scripts that wrap `apfel`. They are bundled inside the binary, so you can write them out wherever you installed apfel from (homebrew-core, the tap, or source) - no repo clone needed:
+Real shell scripts that wrap `apfel`: `cmd` (English to shell command), `oneliner`, `mac-narrator`, `wtd`, `explain`, `naming`, `port`, `gitsum`. They are bundled in the binary - no repo clone. Write them out wherever you installed apfel from (homebrew-core, the tap, or source):
 
 ```bash
 apfel demos ./apfel-demos
 ```
 
-That writes every demo (executable) into `./apfel-demos`, plus a `README.md` describing each. Re-run after `brew upgrade apfel` to refresh them. The same scripts also live in [`demo/`](./demo/) in this repo.
-
-**[cmd](./demo/cmd)** - natural language to shell command:
+That writes every demo (executable) plus a `README.md` into `./apfel-demos`. Then run them from there:
 
 ```bash
-demo/cmd "find all .log files modified today"
+./apfel-demos/cmd "find all .log files modified today"
 # $ find . -name "*.log" -type f -mtime -1
 
-demo/cmd -x "show disk usage sorted by size"   # -x = execute after confirm
-demo/cmd -c "list open ports"                   # -c = copy to clipboard
+./apfel-demos/cmd -x "show disk usage sorted by size"   # -x = execute after confirm
+./apfel-demos/cmd -c "list open ports"                   # -c = copy to clipboard
 ```
 
-**Shell function version** - add to your `.zshrc` and use `cmd` from anywhere:
-
-```bash
-# cmd - natural language to shell command (apfel). Add to .zshrc:
-cmd(){ local x c r a; while [[ $1 == -* ]]; do case $1 in -x)x=1;shift;; -c)c=1;shift;; *)break;; esac; done; r=$(apfel -q -s 'Output only a shell command.' "$*" | sed '/^```/d;/^#/d;s/\x1b\[[0-9;]*[a-zA-Z]//g;s/^[[:space:]]*//;/^$/d' | head -1); [[ $r ]] || { echo "no command generated"; return 1; }; printf '\e[32m$\e[0m %s\n' "$r"; [[ $c ]] && printf %s "$r" | pbcopy && echo "(copied)"; [[ $x ]] && { printf 'Run? [y/N] '; read -r a; [[ $a == y ]] && eval "$r"; }; return 0; }
-```
-
-```bash
-cmd find all swift files larger than 1MB     # shows: $ find . -name "*.swift" -size +1M
-cmd -c show disk usage sorted by size        # shows command + copies to clipboard
-cmd -x what process is using port 3000       # shows command + asks to run it
-cmd list all git branches merged into main
-cmd count lines of code by language
-```
-
-**[oneliner](./demo/oneliner)** - complex pipe chains from plain English:
-
-```bash
-demo/oneliner "sum the third column of a CSV"
-# $ awk -F',' '{sum += $3} END {print sum}' file.csv
-
-demo/oneliner "count unique IPs in access.log"
-# $ awk '{print $1}' access.log | sort | uniq -c | sort -rn
-```
-
-**[mac-narrator](./demo/mac-narrator)** - your Mac's inner monologue:
-
-```bash
-demo/mac-narrator              # one-shot: what's happening right now?
-demo/mac-narrator --watch      # continuous narration every 60s
-```
-
-Also in `demo/`:
-
-- **[wtd](./demo/wtd)** - "what's this directory?" instant project orientation
-- **[explain](./demo/explain)** - explain a command, error, or code snippet
-- **[naming](./demo/naming)** - naming suggestions for functions, variables, files
-- **[port](./demo/port)** - what's using this port?
-- **[gitsum](./demo/gitsum)** - summarize recent git activity
-
-Longer walkthroughs: [docs/demos.md](docs/demos.md).
+Re-run `apfel demos` after `brew upgrade apfel` to refresh. Sources: [`demo/`](./demo/). Walkthroughs and a copy-paste `cmd` shell function for your `.zshrc`: [docs/demos.md](docs/demos.md).
 
 ## MCP Tool Support
 

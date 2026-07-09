@@ -47,10 +47,10 @@ public enum CodeCropper {
     /// A model that complies with the steering directive so thoroughly that
     /// it omits the fence entirely still works: with no fence anywhere, the
     /// whole (trimmed) response is taken as the code. One deterministic
-    /// nicety on that path: a response that is exactly one inline code span
-    /// (`` `pmset -g batt` ``) is unwrapped. Prose without a fence passes
-    /// through as-is — `--code` shapes format, not correctness, and the
-    /// steering makes a fence-less prose answer rare.
+    /// nicety on that path: a response that is exactly one backtick-wrapped
+    /// inline code span is unwrapped. Prose without a fence passes through
+    /// as-is — code mode shapes format, not correctness, and the steering
+    /// makes a fence-less prose answer rare.
     ///
     /// Returns nil only when the response is empty or whitespace-only — the
     /// CLI's exit-7 case.
@@ -64,8 +64,9 @@ public enum CodeCropper {
 
     /// Unwrap `body` (newline-terminated) when its content is exactly one
     /// inline code span: a single line starting and ending with matching
-    /// backtick runs (any length — models wrap one-liners in ``` on a single
-    /// line, which is a span, not a fence) and no other backticks inside.
+    /// backtick runs (any length — models wrap one-liners in a triple-backtick
+    /// run on a single line, which is a span, not a fence) and no other
+    /// backticks inside.
     private static func unwrapInlineSpan(_ body: String) -> String {
         let line = String(body.dropLast())          // strip the trailing \n
         guard !line.contains("\n"), line.hasPrefix("`") else { return body }

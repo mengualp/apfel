@@ -67,9 +67,8 @@ def count_tokens_piped(path: pathlib.Path) -> int:
     return _tokens_from_output(r.stdout.decode(errors="replace"))
 
 
-def model_available() -> bool:
-    r = subprocess.run([str(BINARY), "--model-info"], capture_output=True, text=True, timeout=20)
-    return r.returncode == 0 and "available:  yes" in r.stdout.lower()
+# Shared model gate lives in conftest.py.
+from conftest import require_model  # noqa: E402,F401
 
 
 def debug_extract(path: pathlib.Path) -> str:
@@ -150,9 +149,9 @@ def test_unsupported_file_errors(tmp_path):
 
 # --- End-to-end content proof (requires Apple Intelligence) ---
 
+@pytest.mark.model
 def test_photo_ocr_content_reaches_model():
-    if not model_available():
-        pytest.skip("Apple Intelligence not enabled")
+    require_model()
     r = subprocess.run(
         [str(BINARY), "-f", str(PLAQUE),
          "Output only the exact words you can read in the image, uppercase, nothing else."],

@@ -10,7 +10,6 @@ Run via `make test` (or `python3 -m pytest Tests/integration/`) after the
 release binary has been built.
 """
 
-import functools
 import json
 import os
 import pathlib
@@ -284,26 +283,9 @@ def parse_json_lines_from_output(text):
     return [json.loads(line) for line in text.splitlines() if line.lstrip().startswith("{")]
 
 
-@functools.lru_cache(maxsize=1)
-def model_available():
-    result = run_cli(["--model-info"], timeout=20)
-    return result.returncode == 0 and "available:  yes" in result.stdout.lower()
-
-
-def require_model():
-    if model_available():
-        return
-    # Marker discipline (#266): on a deliberately model-free run (CI sets
-    # APFEL_MODELFREE_ONLY=1 and selects `-m "not model"`), a model test should
-    # never reach this point - if it does, its @pytest.mark.model decorator is
-    # missing and it leaked past the filter. Fail loudly instead of skipping so
-    # the forgotten marker turns CI red rather than passing green-by-skip.
-    if os.environ.get("APFEL_MODELFREE_ONLY"):
-        pytest.fail(
-            "model test ran in a model-free selection (-m 'not model'); it is "
-            "missing @pytest.mark.model"
-        )
-    pytest.skip("Apple Intelligence is not enabled for CLI generation tests.")
+# Shared model gate lives in conftest.py (#266 semantics, was duplicated
+# per suite file).
+from conftest import model_available, require_model  # noqa: E402,F401
 
 
 def test_release_binary_exists():

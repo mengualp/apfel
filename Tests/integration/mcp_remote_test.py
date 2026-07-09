@@ -22,6 +22,13 @@ import pytest
 
 from conftest import post_chat_rotating_seeds
 
+# Whole-suite marker: these tests drive real on-device generation (or, for
+# the permit/benchmark suites, need Apple Intelligence up); GitHub CI cannot
+# run them (CLAUDE.md "What GitHub CI CANNOT run"). Keeps -m "not model" a
+# complete, correct model-free selector for the fast preflight phase (#374).
+pytestmark = pytest.mark.model
+
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 BINARY = ROOT / ".build" / "release" / "apfel"
 HTTP_MCP_SERVER = ROOT / "mcp" / "http-test-server" / "server.py"

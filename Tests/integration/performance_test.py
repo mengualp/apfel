@@ -1,7 +1,16 @@
 import json
+import os
 import pathlib
 import statistics
 import subprocess
+
+import pytest
+
+# Whole-suite marker: these tests drive real on-device generation (or, for
+# the permit/benchmark suites, need Apple Intelligence up); GitHub CI cannot
+# run them (CLAUDE.md "What GitHub CI CANNOT run"). Keeps -m "not model" a
+# complete, correct model-free selector for the fast preflight phase (#374).
+pytestmark = pytest.mark.model
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -21,7 +30,10 @@ _SPEEDUP_BENCHMARKS = [
     "stream_debug_capture_disabled",
 ]
 # Odd count so the median is a single observed run, never an average of two.
-_SPEEDUP_RUNS = 5
+# Default 3 (#374): a median of 3 still absorbs the one noisy run that #264
+# guarded against, at ~half the wall-clock of 5. Set APFEL_BENCH_RUNS=5 when
+# investigating benchmark flakes.
+_SPEEDUP_RUNS = int(os.environ.get("APFEL_BENCH_RUNS", "3"))
 
 
 def _run_benchmarks():

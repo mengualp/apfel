@@ -226,20 +226,16 @@ def parse_json_lines(text):
     return [json.loads(line) for line in text.splitlines() if line.strip()]
 
 
-def model_available():
-    result = run_cli(["--model-info"], timeout=20)
-    return result.returncode == 0 and "available:  yes" in result.stdout.lower()
-
-
-def require_model():
-    if not model_available():
-        pytest.skip("Apple Intelligence not enabled")
+# Shared model gate lives in conftest.py (#266 semantics: fails loudly on a
+# model-free selection instead of skipping).
+from conftest import model_available, require_model  # noqa: E402,F401
 
 
 # ---------------------------------------------------------------------------
 # Category 1: Chat Startup & Exit (5 tests)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.model
 def test_chat_plain_starts_and_shows_header():
     """Chat mode must start and display the Apple Intelligence header."""
     require_model()
@@ -254,6 +250,7 @@ def test_chat_plain_starts_and_shows_header():
     assert "Apple Intelligence" in clean, f"Header missing in: {clean[:200]}"
 
 
+@pytest.mark.model
 def test_chat_quit_exits_cleanly():
     """Typing 'quit' must exit chat with 'Goodbye' message."""
     require_model()
@@ -268,6 +265,7 @@ def test_chat_quit_exits_cleanly():
     assert "Goodbye" in clean
 
 
+@pytest.mark.model
 def test_chat_exit_command_works():
     """Typing 'exit' must also exit chat cleanly."""
     require_model()
@@ -333,6 +331,7 @@ def _run_chat_until_natural_exit(args, first_input, env=None, timeout=120):
     return os.waitstatus_to_exitcode(status), out.decode("utf-8", errors="replace")
 
 
+@pytest.mark.model
 def test_chat_multibyte_backspace_is_character_wise():
     """#256: with setlocale(LC_CTYPE,"") libedit edits non-ASCII by character.
 
@@ -400,6 +399,7 @@ def test_chat_multibyte_backspace_is_character_wise():
     assert b"\xc3" not in after_erase, f"dangling lead byte after erase: {echo!r}"
 
 
+@pytest.mark.model
 def test_chat_ctrl_c_exits_130():
     """#251: Ctrl-C at the chat prompt exits 130 (interrupted).
 
@@ -450,6 +450,7 @@ def test_chat_ctrl_c_exits_130():
     assert os.waitstatus_to_exitcode(status) == 130
 
 
+@pytest.mark.model
 def test_chat_context_rotation_failure_exits_nonzero():
     """#252: a context-rotation failure mid-session must exit nonzero.
 
@@ -469,6 +470,7 @@ def test_chat_context_rotation_failure_exits_nonzero():
     assert "context overflow" in strip_ansi(output).lower()
 
 
+@pytest.mark.model
 def test_chat_eof_exits_cleanly():
     """Ctrl-D (EOF) must exit chat gracefully."""
     require_model()
@@ -487,6 +489,7 @@ def test_chat_eof_exits_cleanly():
 # Category 2: Chat + MCP (5 tests)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.model
 def test_chat_mcp_starts_without_crash():
     """THE BUG FIX TEST: chat + MCP must not crash on startup (#43)."""
     require_model()
@@ -505,6 +508,7 @@ def test_chat_mcp_starts_without_crash():
     assert "Goodbye" in clean, "Must exit cleanly"
 
 
+@pytest.mark.model
 def test_chat_mcp_shows_tool_list_on_startup():
     """MCP tools must be listed at startup (e.g. 'mcp: ... - add, subtract, ...')."""
     require_model()
@@ -521,6 +525,7 @@ def test_chat_mcp_shows_tool_list_on_startup():
         f"MCP tool list not shown at startup: {clean[:400]}"
 
 
+@pytest.mark.model
 def test_chat_mcp_can_execute_tool():
     """Chat+MCP must execute tool calls, not leak raw JSON (#144)."""
     require_model()
@@ -545,6 +550,7 @@ def test_chat_mcp_can_execute_tool():
         f"Raw tool_calls JSON leaked to chat output (#144): {ai_lines[0][:300] if ai_lines else ''}"
 
 
+@pytest.mark.model
 def test_chat_mcp_tool_log_on_stderr():
     """Tool execution log (tool: add(...) = ...) must appear in output."""
     require_model()
@@ -568,6 +574,7 @@ def test_chat_mcp_tool_log_on_stderr():
         f"Raw tool_calls JSON leaked to chat output (#144): {ai_lines[0][:300] if ai_lines else ''}"
 
 
+@pytest.mark.model
 def test_chat_mcp_with_system_prompt():
     """Chat + MCP + system prompt must all work together without crash."""
     require_model()
@@ -590,6 +597,7 @@ def test_chat_mcp_with_system_prompt():
 # Category 3: Chat + System Prompt (3 tests)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.model
 def test_chat_system_prompt_displayed():
     """System prompt must be shown in the chat header area."""
     require_model()
@@ -605,6 +613,7 @@ def test_chat_system_prompt_displayed():
         f"System prompt not displayed: {clean[:300]}"
 
 
+@pytest.mark.model
 def test_chat_system_prompt_from_flag():
     """--system flag must be accepted and shown."""
     require_model()
@@ -619,6 +628,7 @@ def test_chat_system_prompt_from_flag():
     assert "Be brief" in clean
 
 
+@pytest.mark.model
 def test_chat_system_prompt_from_env():
     """APFEL_SYSTEM_PROMPT env var must set the system prompt."""
     require_model()
@@ -639,6 +649,7 @@ def test_chat_system_prompt_from_env():
 # Category 4: Chat + Debug (4 tests)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.model
 def test_chat_debug_shows_output():
     """--debug must produce debug lines in chat mode output."""
     require_model()
@@ -656,6 +667,7 @@ def test_chat_debug_shows_output():
         f"No debug output found: {clean[:500]}"
 
 
+@pytest.mark.model
 def test_chat_debug_shows_prompt_info():
     """Debug output must include prompt-related info."""
     require_model()
@@ -673,6 +685,7 @@ def test_chat_debug_shows_prompt_info():
         f"Debug prompt info missing: {clean[:500]}"
 
 
+@pytest.mark.model
 def test_chat_debug_shows_response_info():
     """Debug output must include response-related info."""
     require_model()
@@ -690,6 +703,7 @@ def test_chat_debug_shows_response_info():
         f"Debug response info missing: {clean[:500]}"
 
 
+@pytest.mark.model
 def test_chat_debug_json_does_not_pollute_stdout():
     """In JSON mode + debug, debug output must go to TTY/stderr, not stdout."""
     require_model()
@@ -714,6 +728,7 @@ def test_chat_debug_json_does_not_pollute_stdout():
 # Category 5: Chat Output Formats (4 tests)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.model
 def test_chat_plain_shows_ai_prefix():
     """Plain mode must show ' ai> ' prompt prefix."""
     require_model()
@@ -730,6 +745,7 @@ def test_chat_plain_shows_ai_prefix():
     assert "ai" in clean, f"AI prompt prefix missing: {clean[:300]}"
 
 
+@pytest.mark.model
 def test_chat_json_emits_jsonl():
     """JSON mode must emit valid JSONL with role fields."""
     require_model()
@@ -747,6 +763,7 @@ def test_chat_json_emits_jsonl():
     assert "user" in roles, f"No user message in JSONL: {roles}"
 
 
+@pytest.mark.model
 def test_chat_json_user_and_assistant_messages():
     """JSON mode must emit both user and assistant messages."""
     require_model()
@@ -764,6 +781,7 @@ def test_chat_json_user_and_assistant_messages():
     assert "assistant" in roles, f"Missing assistant message: {roles}"
 
 
+@pytest.mark.model
 def test_chat_quiet_suppresses_chrome():
     """--quiet must suppress header, prompts, hints."""
     require_model()
@@ -786,6 +804,7 @@ def test_chat_quiet_suppresses_chrome():
 # Category 6: Chat + Flags Combinations (4 tests)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.model
 def test_chat_with_temperature():
     """--temperature flag must be accepted in chat mode."""
     require_model()
@@ -801,6 +820,7 @@ def test_chat_with_temperature():
     assert "error" not in clean.lower() or "quit" in clean.lower()
 
 
+@pytest.mark.model
 def test_chat_with_max_tokens():
     """--max-tokens flag must be accepted in chat mode."""
     require_model()
@@ -815,6 +835,7 @@ def test_chat_with_max_tokens():
     assert "Goodbye" in clean
 
 
+@pytest.mark.model
 def test_chat_with_permissive():
     """--permissive flag must be accepted in chat mode."""
     require_model()
@@ -829,6 +850,7 @@ def test_chat_with_permissive():
     assert "Goodbye" in clean
 
 
+@pytest.mark.model
 def test_chat_with_retry():
     """--retry flag must be accepted in chat mode."""
     require_model()
@@ -847,6 +869,7 @@ def test_chat_with_retry():
 # Category 7: Chat Multi-Turn & Misc (2+ tests)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.model
 def test_chat_multi_turn_maintains_context():
     """Two prompts in chat; second references first to verify context retention."""
     require_model()
@@ -869,6 +892,7 @@ def test_chat_multi_turn_maintains_context():
         f"Context lost: second response doesn't mention 'Zephyr': {second_response}"
 
 
+@pytest.mark.model
 def test_chat_mcp_answers_non_tool_questions():
     """Chat+MCP must answer general questions (not just tool calls)."""
     require_model()
@@ -889,6 +913,7 @@ def test_chat_mcp_answers_non_tool_questions():
         f"MCP mode failed to answer non-tool question: {content}"
 
 
+@pytest.mark.model
 def test_chat_no_mcp_answers_translation():
     """Chat without MCP must answer general questions normally."""
     require_model()
@@ -908,6 +933,7 @@ def test_chat_no_mcp_answers_translation():
         f"Expected 'gelb' in translation, got: {content}"
 
 
+@pytest.mark.model
 def test_chat_mcp_with_system_prompt_answers_normally():
     """Chat + MCP + system prompt must still answer non-tool questions."""
     require_model()
@@ -991,6 +1017,7 @@ def _run_chat_with_sigint(args, wait_for, delay_before_sigint=0.5, timeout=15, e
         return -9, output.decode("utf-8", errors="replace")
 
 
+@pytest.mark.model
 def test_chat_ctrl_c_at_empty_prompt_exits():
     """Ctrl-C (SIGINT) at an empty prompt should exit chat."""
     require_model()
@@ -999,6 +1026,7 @@ def test_chat_ctrl_c_at_empty_prompt_exits():
     assert returncode in (0, 130, -2, -9), f"Unexpected exit: {returncode}"
 
 
+@pytest.mark.model
 def test_chat_ctrl_c_mid_line_exits():
     """Ctrl-C while typing should exit chat (SIGINT kills process)."""
     require_model()
@@ -1008,6 +1036,7 @@ def test_chat_ctrl_c_mid_line_exits():
     assert returncode in (130, -2, -9), f"Expected SIGINT exit, got: {returncode}"
 
 
+@pytest.mark.model
 def test_chat_ctrl_d_at_empty_prompt_exits():
     """Ctrl-D (EOF) at an empty prompt should exit chat."""
     require_model()
@@ -1022,6 +1051,7 @@ def test_chat_ctrl_d_at_empty_prompt_exits():
     assert returncode in (0, 1, -9), f"Unexpected exit: {returncode}"
 
 
+@pytest.mark.model
 def test_chat_ctrl_c_during_response_does_not_crash():
     """Ctrl-C (SIGINT) during model response should not crash."""
     require_model()
@@ -1032,6 +1062,7 @@ def test_chat_ctrl_c_during_response_does_not_crash():
     assert "Bus error" not in clean
 
 
+@pytest.mark.model
 def test_chat_ctrl_c_multiple_times_exits():
     """Sending SIGINT should exit chat."""
     require_model()
@@ -1040,6 +1071,7 @@ def test_chat_ctrl_c_multiple_times_exits():
     assert returncode in (0, 130, -2, -9), f"Unexpected exit: {returncode}"
 
 
+@pytest.mark.model
 def test_chat_hint_message_shown():
     """'Type quit to exit.' hint must appear at startup."""
     require_model()
@@ -1059,6 +1091,7 @@ def test_chat_hint_message_shown():
 # Persistent history (APFEL_HISTFILE, #259) - opt-in, off by default
 # ---------------------------------------------------------------------------
 
+@pytest.mark.model
 def test_chat_history_persists_with_histfile(tmp_path):
     """With APFEL_HISTFILE set, a typed prompt is written to the file on exit.
 
@@ -1088,6 +1121,7 @@ def test_chat_history_persists_with_histfile(tmp_path):
     assert (histfile.stat().st_mode & 0o777) == 0o600, oct(histfile.stat().st_mode)
 
 
+@pytest.mark.model
 def test_chat_multibyte_backspace_buffer_is_clean_end_to_end(tmp_path):
     """#339: prove the EDIT BUFFER (not just the redisplay) is character-wise.
 
@@ -1124,6 +1158,7 @@ def test_chat_multibyte_backspace_buffer_is_clean_end_to_end(tmp_path):
         f"dangling UTF-8 lead byte survived into the buffer: {data!r}"
 
 
+@pytest.mark.model
 def test_chat_history_off_by_default(tmp_path):
     """Without APFEL_HISTFILE, a pre-seeded file is neither read nor rewritten.
 
@@ -1155,6 +1190,7 @@ def test_chat_history_off_by_default(tmp_path):
 # user turn and prints a one-line notice on startup.
 # ---------------------------------------------------------------------------
 
+@pytest.mark.model
 def test_chat_f_flag_prints_context_notice(tmp_path):
     """`-f file --chat` announces the loaded context on startup (#370).
 
@@ -1177,6 +1213,7 @@ def test_chat_f_flag_prints_context_notice(tmp_path):
     assert "context" in clean, f"no context-loaded notice on startup: {clean[:400]!r}"
 
 
+@pytest.mark.model
 def test_chat_f_flag_content_is_in_context(tmp_path):
     """`-f file --chat` puts the file content in the model's context (#370).
 

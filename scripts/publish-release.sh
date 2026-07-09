@@ -85,7 +85,16 @@ done
 # This ensures new test files are never silently excluded from release qualification.
 # APFEL_REQUIRE_FULL=1: any skipped test fails the release (#227) - a skip means a
 # feature shipped unverified (the exact green-by-skip hole this closes).
-APFEL_REQUIRE_FULL=1 python3 -m pytest Tests/integration/ -v --tb=short
+# Two phases (#374): the model-free/parallel-safe partition first (cheap gates
+# fail before any model time is spent; parallel when pytest-xdist is present),
+# then the serial model phase. The marker expressions are complements: every
+# test runs exactly once, all against the stamped release binary.
+XDIST_ARGS=""
+if python3 -c "import xdist" 2>/dev/null; then
+    XDIST_ARGS="-n auto --dist loadfile"
+fi
+APFEL_REQUIRE_FULL=1 python3 -m pytest Tests/integration/ -m "not model and not serial" $XDIST_ARGS -v --tb=short
+APFEL_REQUIRE_FULL=1 python3 -m pytest Tests/integration/ -m "model or serial" -v --tb=short
 
 # Stop servers
 kill "$SERVER_PID" "$MCP_SERVER_PID" 2>/dev/null || true

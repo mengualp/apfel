@@ -15,6 +15,13 @@ import httpx
 
 from conftest import GUARDRAIL_SEEDS
 
+# Whole-suite marker: these tests drive real on-device generation (or, for
+# the permit/benchmark suites, need Apple Intelligence up); GitHub CI cannot
+# run them (CLAUDE.md "What GitHub CI CANNOT run"). Keeps -m "not model" a
+# complete, correct model-free selector for the fast preflight phase (#374).
+pytestmark = pytest.mark.model
+
+
 BASE_URL = "http://localhost:11434/v1"
 MODEL = "apple-foundationmodel"
 

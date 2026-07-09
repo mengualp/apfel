@@ -14,6 +14,40 @@ MCP_SERVER = ROOT / "mcp" / "calculator" / "server.py"
 OPENAI_SPEC = pathlib.Path(__file__).parent / "openai_spec" / "openapi.yaml"
 
 
+_MODEL_AVAILABLE = None
+
+
+def model_available():
+    """True when Apple Intelligence is enabled for generation (cached)."""
+    global _MODEL_AVAILABLE
+    if _MODEL_AVAILABLE is None:
+        r = subprocess.run(
+            [str(BINARY), "--model-info"],
+            capture_output=True, text=True, timeout=20,
+        )
+        _MODEL_AVAILABLE = r.returncode == 0 and "available:  yes" in r.stdout.lower()
+    return _MODEL_AVAILABLE
+
+
+def require_model():
+    """Shared model gate for every suite (single source, was duplicated per file).
+
+    Marker discipline (#266): on a deliberately model-free run (CI sets
+    APFEL_MODELFREE_ONLY=1 and selects `-m "not model"`), a model test should
+    never reach this point - if it does, its @pytest.mark.model decorator is
+    missing and it leaked past the filter. Fail loudly instead of skipping so
+    the forgotten marker turns CI red rather than passing green-by-skip.
+    """
+    if model_available():
+        return
+    if os.environ.get("APFEL_MODELFREE_ONLY"):
+        pytest.fail(
+            "model test ran in a model-free selection (-m 'not model'); it is "
+            "missing @pytest.mark.model"
+        )
+    pytest.skip("Apple Intelligence is not enabled for generation tests.")
+
+
 def pytest_sessionfinish(session, exitstatus):
     """Enforce the "never skip" rule during release qualification (#227).
 

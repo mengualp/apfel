@@ -9,6 +9,7 @@ DerivedData/
 __pycache__/
 .notes/
 apfel-*.tar.gz
+apfel-*.tar.gz.sha256
 .worktrees/
 
 # Internal working notes (SDD controller ledger)

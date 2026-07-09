@@ -7,6 +7,8 @@ and this project adheres to [https://semver.org/](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-07-09
+
 ### Fixed
 
 - A model-emitted tool call whose arguments are a quoted string with unescaped inner quotes (e.g. `"arguments": "{"value1": 1234, "value2": 5678}"`) is no longer dropped when the argument object is actually recoverable. `salvageUnparseableToolCall` now runs a string-aware balanced-brace scan (`extractFirstBalancedObject`) over the raw arguments text and, when it finds a single balanced `{ ... }` that parses as valid JSON, substitutes it so the tool call executes; when no unambiguous object is extractable the raw text is kept so validation still fails loud, preserving #241's "never guess" principle. Follow-up to #358 (#367).

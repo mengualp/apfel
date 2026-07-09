@@ -7,6 +7,8 @@ and this project adheres to [https://semver.org/](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-07-09
+
 ### Fixed
 
 - `-f file` (and a positional prompt or piped content) is now honored in `--chat` instead of being silently dropped. The extracted content is folded into the session instructions so the model already has it in context on the first turn, and chat prints a one-line `context:` notice on startup. Previously `apfel -f code.swift --chat` read/OCR'd the file at parse time and then threw it away (#370).

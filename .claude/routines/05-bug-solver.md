@@ -71,6 +71,7 @@ Once authorised:
    - **Never add a new dependency.** If a fix seems to require a new package, stop and comment instead.
    - **Follow apfel code style.** Swift 6 strict concurrency. Error types in `Sources/Core/ApfelError.swift`. No `@unchecked Sendable` without explicit justification. Proper retry via `withRetry` from `Sources/Core/Retry.swift`.
    - **Write a test first.** Per CLAUDE.md: bugs get TDD. Add the failing test in the appropriate suite (`Tests/apfelTests/*Tests.swift` for pure-core, `Tests/integration/` for server/CLI). Use the existing conftest pattern - no standalone scripts.
+   - **Add a CHANGELOG entry.** Whenever your fix changes `Sources/**` you MUST add a `### Fixed` bullet under `## [Unreleased]` in `CHANGELOG.md` (plain hyphens, reference the issue number). `CHANGELOG.md` is NOT on the forbidden list - you are expected to write it. A source change with no `[Unreleased]` entry fails the CI `changelog-gate` (#369) and, if it somehow merged, would hard-block the next release at `stamp-changelog.sh` (gate #263). Do NOT write a dated `## [x.y.z]` heading - only the `[Unreleased]` bullet; the release stamps the version.
    - **Self-review the diff before committing.** Does it contain anything you copy-pasted from the issue body? If yes, re-read that source and make sure it is safe. Does it modify anything on the forbidden list above? If yes, stop.
 
 7. **Open the PR as a DRAFT.**

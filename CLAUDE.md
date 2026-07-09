@@ -224,6 +224,7 @@ Priority-rank findings:
 - New public API on a pure `ApfelCore` type? Unit test in the corresponding `Tests/apfelTests/*Tests.swift`
 - New network or subprocess surface? Integration test wired into `Tests/integration/` using the existing conftest pattern - **standalone manual scripts in `mcp/`, `scripts/`, etc. do not count**
 - Error tests must use the tightened style: `catch let e as CLIParseError { assertTrue(e.message.contains("...")) }` - not just `threw = true`
+- **Any `Sources/**` change (except the generated `BuildInfo.swift`) MUST add a `## [Unreleased]` bullet to `CHANGELOG.md`.** CI enforces this via the `changelog-gate` job (`scripts/check-changelog.sh`, #369); a changelog-less code PR that merges anyway hard-blocks the next release at `stamp-changelog.sh` (gate #263) - this is what stalled v1.8.1.
 
 ### 8. Build + run tests on the PR branch
 
@@ -274,6 +275,7 @@ Do not approve code PRs with P0 findings. For docs-only PRs, a request-changes o
 ### PR anti-patterns to reject
 
 - No tests for new flags or new behavior
+- A `Sources/**` change with no `CHANGELOG.md [Unreleased]` entry (fails the `changelog-gate` CI job, #369)
 - Standalone test scripts that require manual terminal orchestration (not wired into CI)
 - `@unchecked Sendable` without explicit thread-safety proof
 - `URLSession.shared` for new network code (shared cookie jar, shared cache)

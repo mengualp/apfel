@@ -68,6 +68,10 @@ jobs:
           # emitted sections; guards the generator's hardcoded TOC (#331).
           python3 -m pytest Tests/integration/test_examples_doc.py -v --tb=short
 
+          # CHANGELOG merge-gate logic (model-free): scripts/check-changelog.sh
+          # blocks a Sources/** change with no [Unreleased] entry (#369).
+          python3 -m pytest Tests/integration/test_changelog_gate.py -v --tb=short
+
           # Note: performance_test.py requires Apple Intelligence (benchmark runs inference).
           # It runs locally via make preflight / make release.
 
@@ -107,6 +111,26 @@ jobs:
           kill "$(cat /tmp/apfel-server.pid)" "$(cat /tmp/apfel-mcp.pid)" 2>/dev/null || true
           rm -f /tmp/apfel-server.pid /tmp/apfel-mcp.pid
           exit $STATUS
+
+  changelog-gate:
+    # Permanent guard (#369): a PR that changes production source (Sources/**,
+    # excluding the generated BuildInfo.swift) must carry a non-empty
+    # CHANGELOG.md [Unreleased] entry. Without it the change merges
+    # changelog-less and then hard-blocks the next release at stamp-changelog.sh
+    # (gate #263) - which is exactly what stalled v1.8.1. Cheap Linux job, no
+    # Xcode needed; only meaningful on pull_request (on push to main the
+    # base...HEAD diff is empty and the gate passes).
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Fetch base branch
+        run: git fetch --no-tags --prune origin "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+      - name: Require CHANGELOG [Unreleased] entry for source changes
+        run: bash scripts/check-changelog.sh "origin/${{ github.base_ref }}"
 
   apfelcore-public-api:
     runs-on: macos-26

@@ -7,6 +7,14 @@ and this project adheres to [https://semver.org/](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A model-emitted tool call whose arguments are a quoted string with unescaped inner quotes (e.g. `"arguments": "{"value1": 1234, "value2": 5678}"`) is no longer dropped when the argument object is actually recoverable. `salvageUnparseableToolCall` now runs a string-aware balanced-brace scan (`extractFirstBalancedObject`) over the raw arguments text and, when it finds a single balanced `{ ... }` that parses as valid JSON, substitutes it so the tool call executes; when no unambiguous object is extractable the raw text is kept so validation still fails loud, preserving #241's "never guess" principle. Follow-up to #358 (#367).
+
+### Changed
+
+- CI now blocks any pull request that changes production source (`Sources/**`, excluding the generated `BuildInfo.swift`) without a `CHANGELOG.md [Unreleased]` entry, via the `changelog-gate` job and `scripts/check-changelog.sh`. This moves the empty-`[Unreleased]` enforcement from release time (`stamp-changelog.sh`, #263) to merge time, so a code fix can no longer merge changelog-less and stall the next release - the root cause of the v1.8.1 delay (#369).
+
 ## [1.8.0] - 2026-07-03
 
 ### Changed

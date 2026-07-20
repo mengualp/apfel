@@ -584,6 +584,39 @@ def test_health_schema():
     validate(instance=resp.json(), schema=HEALTH_SCHEMA)
 
 
+def test_health_context_window_positive():
+    """/health context_window must never be 0 (#192).
+
+    On macOS 27 the SDK returns contextSize 0 during cold start; the
+    high-water-mark floor in TokenCounter prevents this from leaking
+    to clients. Model-free: the 4096 floor applies regardless of model
+    availability.
+    """
+    resp = httpx.get(f"{BASE_URL}/health", timeout=10)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["context_window"] > 0, (
+        f"context_window is {data['context_window']}; expected > 0 (#192)"
+    )
+
+
+def test_models_context_window_positive():
+    """/v1/models context_window must never be 0 (#192).
+
+    Same root cause as the /health regression: startup-cached
+    contextSize locked in 0 on macOS 27. The per-request read with
+    high-water-mark floor prevents this.
+    """
+    resp = httpx.get(f"{BASE_URL}/v1/models", timeout=10)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["data"]) > 0
+    model_entry = data["data"][0]
+    assert model_entry.get("context_window", 0) > 0, (
+        f"context_window is {model_entry.get('context_window')}; expected > 0 (#192)"
+    )
+
+
 # ============================================================================
 # Tests — CORS
 # ============================================================================

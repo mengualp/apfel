@@ -4,7 +4,7 @@ apfel natively speaks the [https://modelcontextprotocol.io/](https://modelcontex
 
 All inference runs on-device with no network calls for the LLM itself. Optional remote MCP tool servers (`--mcp https://...`) do make network calls for tool arguments.
 
-> **Ready-made MCPs for apfel**: [apfel-mcp.franzai.com](https://apfel-mcp.franzai.com/) ships three token-budget-optimized MCP servers for apfel's 4096-token context window: `url-fetch`, `ddg-search`, and the flagship compound `search-and-fetch` tool. Details in [Ready-made MCPs](#ready-made-mcps) below.
+> **Ready-made MCPs for apfel**: [apfel-mcp.franzai.com](https://apfel-mcp.franzai.com/) ships three token-budget-optimized MCP servers for apfel's small on-device context window (4096 tokens on macOS 26, 8192 on macOS 27): `url-fetch`, `ddg-search`, and the flagship compound `search-and-fetch` tool. Details in [Ready-made MCPs](#ready-made-mcps) below.
 
 ## Quick start
 
@@ -217,7 +217,7 @@ apfel --mcp ./my-tool.py "question that needs the tool"
 
 ## Limitations
 
-- **4096 token context window.** Tool definitions, question, tool result, and final answer must all fit.
+- **Small context window (4096 tokens on macOS 26, 8192 on macOS 27 - read at runtime).** Tool definitions, question, tool result, and final answer must all fit.
 - **One tool call per turn.** Multi-tool chains require multiple round trips.
 - **No guaranteed schema compliance.** The model follows schemas loosely. Your server must handle unexpected argument formats.
 - **No streaming for tool calls.** Tool call responses are always non-streaming.
@@ -240,7 +240,7 @@ See `mcp/calculator/server.py` for a complete working example.
 
 ## Ready-made MCPs
 
-- [apfel-mcp.franzai.com](https://apfel-mcp.franzai.com/) - three token-budget-optimized MCP servers for apfel's 4096-token context window:
+- [apfel-mcp.franzai.com](https://apfel-mcp.franzai.com/) - three token-budget-optimized MCP servers for apfel's small on-device context window:
   - `apfel-mcp-url-fetch` - fetch a URL, extract the main article with Readability, return clean Markdown. SSRF blocklist, 6000-char hard cap.
   - `apfel-mcp-ddg-search` - DuckDuckGo web search via direct HTML scrape. No API key. 2000-char hard cap.
   - `apfel-mcp-search-and-fetch` - the flagship compound tool. Searches AND fetches the top N result pages in ONE tool call. Saves ~500 tokens of schema/state overhead vs chaining separate tools. Declared as both `search` and `web_search` so the 3B model's hallucinated tool names still route correctly.

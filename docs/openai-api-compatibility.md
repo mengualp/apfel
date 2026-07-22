@@ -54,6 +54,6 @@ MCP tools attached with `--mcp` are auto-executed on Chat Completions only; `/v1
 - `GET /health` stays useful for local availability checks even when the rest of the server is token-protected, if you opt into `--public-health`.
 - Debug log endpoints exist only when the server is started with `--debug`.
 - Browser access, origin checks, bearer tokens, and `--footgun` behavior are documented in [server-security.md](server-security.md).
-- **`max_tokens` omitted = use the remaining 4096-token context window** (drop-in OpenAI semantics). If the model runs into the ceiling, the response ends cleanly with `finish_reason: "length"` and the partial content is returned (HTTP 200). Pass `max_tokens` explicitly when you want a tighter latency budget or a known cap. Full rationale and examples in [README.md](../README.md#default-response-cap-max_tokens).
+- **`max_tokens` omitted = use the remaining context window** (4096 tokens on macOS 26, 8192 on macOS 27 - read at runtime; drop-in OpenAI semantics). If the model runs into the ceiling, the response ends cleanly with `finish_reason: "length"` and the partial content is returned (HTTP 200). Pass `max_tokens` explicitly when you want a tighter latency budget or a known cap. Full rationale and examples in [README.md](../README.md#default-response-cap-max_tokens).
 
 Full upstream schema reference: [https://github.com/openai/openai-openapi](https://github.com/openai/openai-openapi)

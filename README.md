@@ -20,7 +20,7 @@ Apple Silicon Macs ship a built-in LLM via [Apple FoundationModels](https://deve
 
 `apfel --chat` - interactive REPL.
 
-Tool calling works in all contexts. 4096-token context.
+Tool calling works in all contexts. On-device context window: 4096 tokens on macOS 26, 8192 on macOS 27 - read at runtime, see [Limitations](#limitations).
 
 ![apfel CLI](screenshots/cli.png)
 
@@ -244,9 +244,9 @@ Full API spec: [openai/openai-openapi](https://github.com/openai/openai-openapi)
 
 ## Default response cap (`max_tokens`)
 
-When `max_tokens` is omitted, **CLI and OpenAI-compatible server behave identically**: the value flows through as `nil` and the model uses whatever room is left in the 4096-token context window. This is drop-in OpenAI semantics - no arbitrary fallback constant.
+When `max_tokens` is omitted, **CLI and OpenAI-compatible server behave identically**: the value flows through as `nil` and the model uses whatever room is left in the context window. This is drop-in OpenAI semantics - no arbitrary fallback constant.
 
-The on-device model has a **4096-token context window** that holds input *and* output combined. If generation runs into the ceiling, the response ends cleanly with `finish_reason: "length"` and the partial content is returned (server: HTTP 200; CLI: exit 0 with a stderr warning). Pass `max_tokens` explicitly when you want a tighter latency budget or a known cap for your client.
+The on-device context window holds input *and* output combined: **4096 tokens on macOS 26, 8192 on macOS 27**. apfel reads the real size at runtime via `SystemLanguageModel.contextSize` - check yours with `apfel --model-info`. If generation runs into the ceiling, the response ends cleanly with `finish_reason: "length"` and the partial content is returned (server: HTTP 200; CLI: exit 0 with a stderr warning). Pass `max_tokens` explicitly when you want a tighter latency budget or a known cap for your client.
 
 ### Examples
 
@@ -274,7 +274,7 @@ curl -sS http://localhost:11434/v1/chat/completions \
 | Long paragraph / structured JSON       | 1024 - 2048   |
 | As long as the context window allows   | omit it       |
 
-Keep `input_tokens + max_tokens` comfortably below 4096. If the prompt itself exceeds the window, generation cannot start and the request fails with `[context overflow]` (HTTP 400 / CLI exit 4). The validator rejects non-positive values (`max_tokens <= 0`).
+Keep `input_tokens + max_tokens` comfortably below the context window (4096 tokens on macOS 26, 8192 on macOS 27). If the prompt itself exceeds the window, generation cannot start and the request fails with `[context overflow]` (HTTP 400 / CLI exit 4). The validator rejects non-positive values (`max_tokens <= 0`).
 
 ### CLI parity
 
@@ -298,7 +298,7 @@ apfel --serve --permissive             # every request uses permissive guardrail
 
 | Constraint | Detail |
 |------------|--------|
-| Context window | **4096 tokens** (input + output combined) |
+| Context window | **4096 tokens on macOS 26, 8192 on macOS 27** (input + output combined). Not a hardcoded constant - apfel reads `SystemLanguageModel.contextSize` at runtime; `apfel --model-info` prints the live value |
 | Platform | macOS 26+, Apple Silicon only |
 | Model | One model (`apple-foundationmodel`, ~3B params on-device), not configurable |
 | Guardrails | Apple's safety system may block benign prompts. `--permissive` reduces false positives ([docs/PERMISSIVE.md](docs/PERMISSIVE.md)) |
@@ -384,7 +384,7 @@ Projects built on apfel. Each ships as its own repo + Homebrew formula.
 | [**apfel-clip**](https://apfel-clip.franzai.com) | Menu-bar AI actions on the clipboard: summarize, translate, rewrite. | `brew install Arthur-Ficial/tap/apfel-clip` |
 | [**apfel-quick**](https://apfel-quick.franzai.com) | Instant AI overlay: press a key, ask, answer, dismiss. | `brew install Arthur-Ficial/tap/apfel-quick` |
 | [**apfelpad**](https://apfelpad.franzai.com) | Formula notepad - on-device AI as an inline cell function. | `brew install Arthur-Ficial/tap/apfelpad` |
-| [**apfel-mcp**](https://apfel-mcp.franzai.com) | Token-budget-optimized MCPs for the 4096 window: `url-fetch`, `ddg-search`, `search-and-fetch`. | `brew install Arthur-Ficial/tap/apfel-mcp` |
+| [**apfel-mcp**](https://apfel-mcp.franzai.com) | Token-budget-optimized MCPs for the small on-device window: `url-fetch`, `ddg-search`, `search-and-fetch`. | `brew install Arthur-Ficial/tap/apfel-mcp` |
 | [**apfel-gui**](https://github.com/Arthur-Ficial/apfel-gui) | SwiftUI debug inspector: request timeline, MCP protocol viewer, TTS/STT. | `brew install Arthur-Ficial/tap/apfel-gui` |
 | [**apfel-run**](https://github.com/Arthur-Ficial/apfel-run) | UNIX wrapper adding a persistent MCP registry + TOML config on top of `apfel`. | `brew install Arthur-Ficial/tap/apfel-run` |
 | [**apfel-tag**](https://github.com/Arthur-Ficial/apfel-tag) | On-device content tagging CLI: pipe text in, get tags/topics/emotions out. | `brew install Arthur-Ficial/tap/apfel-tag` |

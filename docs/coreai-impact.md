@@ -5,6 +5,7 @@
 > (FoundationModels OS 27 updates) and
 > [developer.apple.com/documentation/coreai](https://developer.apple.com/documentation/coreai/) (Core AI, beta).
 > Tracking epic: [#189](https://github.com/Arthur-Ficial/apfel/issues/189).
+> Updated 2026-07-22: OS 27 on-device context window confirmed as 8192 on real hardware (#192).
 
 ## TL;DR
 
@@ -23,9 +24,10 @@ confirms (not press speculation):
   an official bridge to drive any model through the FoundationModels session API. This makes a
   bring-your-own-model path tractable (#195).
 - **`ToolCallingMode`** and **improved error types** - adoption candidates for apfel (#197).
-- **On-device context window likely doubled to 8192 on OS 27** (WWDC26 session-241 prints
-  `model.contextSize // 8192`); apfel reads this at runtime so behavior is safe, but ~20 hardcoded
-  "4096" doc references need an audit. See the corrected item #1 below for the full analysis (#192).
+- **On-device context window DOUBLED from 4096 to 8192 on OS 27 - CONFIRMED on real hardware**
+  (M3 Pro, macOS 27, via `apfel --model-info` and `apfel --count-tokens`). apfel already handles it
+  correctly because it reads `SystemLanguageModel.contextSize` at runtime. The hardcoded "4096" doc
+  references have been rewritten to describe the dynamic window (#192). See item #1 below.
 
 **The non-event: "Core AI" is just the Core ML successor.** It is a low-level tensor inference runtime
 (`AIModel`/`NDArray`/`InferenceFunction`), **not** a replacement for FoundationModels, with no chat,
@@ -152,24 +154,20 @@ Core AI per se, but they ship in the same window and Core AI is the headline tha
 > [Foundation Models updates](https://developer.apple.com/documentation/updates/foundationmodels)
 > page (June 2026 / OS 27 entries), not just press reporting.** Details folded into the items below.
 
-1. **FoundationModels context window - on-device window likely DOUBLED to 8192 on OS 27.**
-   **Correction (2026-06-09):** the WWDC26 session-241
-   ([video](https://developer.apple.com/videos/play/wwdc2026/241/)) example prints
-   `let model = SystemLanguageModel(); print(model.contextSize) // 8192` for the **on-device** model,
-   and search corroborates 8192 for the OS 27 on-device model. This contradicts my earlier read that
-   the on-device window "still reads 4096." The most likely truth: 4096 on the current (OS 26) model,
-   **8192 on the new OS 27 on-device model**. The 32K figure is separate again - that is the cloud
-   `PrivateCloudComputeLanguageModel`, which apfel does not use.
-   - **Behavior is safe either way:** apfel reads the live value via `SystemLanguageModel.contextSize`
-     (`Sources/TokenCounter.swift` -> `CLI.swift`, `Server.swift`, `Benchmark.swift`), not a hardcode.
-   - **Docs are NOT safe:** the literal string **4096** is hardcoded across `README.md` (lines 23, 262,
-     264, 292, 316, 401), `demo/README.md`, `docs/context-strategies.md`, `docs/integrations.md`,
-     `docs/openai-api-compatibility.md`, `docs/mcp-calculator.md`, `docs/guides/index.md`,
-     `docs/local-setup-with-vs-code.md`, `docs/vscode-copilot.md`, and `docs/tool-calling-guide.md`.
-     If OS 27 on-device is 8192, these become wrong for OS 27 users.
-   - **Do not bulk-edit yet:** confirm the real number on OS 27 hardware first (one `apfel` run prints
-     `context: <N> tokens`). Then decide whether docs should state a range ("4096 on macOS 26, 8192 on
-     macOS 27") or point at the runtime value. Tracked separately from this page.
+1. **FoundationModels context window - on-device window DOUBLED to 8192 on OS 27 (CONFIRMED).**
+   **Confirmed 2026-07-22 on real hardware (M3 Pro, macOS 27):** `apfel --model-info` reports
+   `context: 8192 tokens` and `apfel --count-tokens` budgets against the same value; the same
+   commands report 4096 on macOS 26. This matches the WWDC26 session-241
+   ([video](https://developer.apple.com/videos/play/wwdc2026/241/)) example, which prints
+   `let model = SystemLanguageModel(); print(model.contextSize) // 8192` for the **on-device** model.
+   So: **4096 tokens on macOS 26, 8192 on macOS 27.** The 32K figure is separate again - that is the
+   cloud `PrivateCloudComputeLanguageModel`, which apfel does not use.
+   - **Behavior was always safe:** apfel reads the live value via `SystemLanguageModel.contextSize`
+     (`Sources/TokenCounter.swift` -> `CLI.swift`, `Server.swift`, `Benchmark.swift`), not a
+     hardcode. No code change needed for the doubling.
+   - **Docs are fixed (#192):** the hardcoded "4096" references across `README.md` and `docs/` now
+     describe the dynamic window ("4096 tokens on macOS 26, 8192 on macOS 27") and point at
+     `apfel --model-info` for the live value.
 
 2. **FoundationModels base model change - CONFIRMED.** Apple's updates page states verbatim: *"the
    model changes when a person updates to iOS 27, iPadOS 27, macOS 27, and visionOS 27, test your
@@ -250,12 +248,13 @@ FoundationModels OS 27 updates (official, fetched 2026-06-09):
   to ... 27"), `LanguageModel` protocol, open-source `CoreAILanguageModel` / `MLXLanguageModel`,
   `GenerationOptions.ToolCallingMode`, improved error types, `DynamicProfile`, image analysis,
   `PrivateCloudComputeLanguageModel` (cloud, larger context).
-- The on-device context window is **4,096 tokens on macOS 26**; WWDC26 session 241 shows **8,192 on
-  the OS 27 on-device model** (see corrected item #1 above). The 32K+ figure is separate again - that
-  is the cloud `PrivateCloudComputeLanguageModel`, which apfel does not use.
+- The on-device context window is **4,096 tokens on macOS 26** and **8,192 tokens on macOS 27** -
+  confirmed on real macOS 27 hardware via `apfel --model-info` and `apfel --count-tokens` (see
+  item #1 above). The 32K+ figure is separate again - that is the cloud
+  `PrivateCloudComputeLanguageModel`, which apfel does not use.
 
 Context / reporting: WWDC 2026 keynote coverage (2026-06-08) on the Core ML to Core AI rename, the
 FoundationModels coexistence story, and the Apple/Google Gemini base-model collaboration. The
-on-device base-model change and the new APIs above are confirmed by Apple's updates page; the exact
-on-device context window should still be read at runtime via `SystemLanguageModel.contextSize` on OS 27
-hardware rather than hardcoded.
+on-device base-model change and the new APIs above are confirmed by Apple's updates page; the
+on-device context window has since been confirmed on OS 27 hardware (8192 tokens) and is always read
+at runtime via `SystemLanguageModel.contextSize` rather than hardcoded.

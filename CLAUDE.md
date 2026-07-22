@@ -55,7 +55,7 @@ The README.md mirrors this priority - **violating this structure is a bug.**
 ### Non-negotiable principles:
 
 - **100% on-device.** No cloud, no API keys, no network for inference. Ever.
-- **Honest about limitations.** 4096 token context, no embeddings, no vision - say so clearly.
+- **Honest about limitations.** Small on-device context window (4096 tokens on macOS 26, 8192 on macOS 27 - read at runtime via `SystemLanguageModel.contextSize`, never hardcoded), no embeddings, no vision - say so clearly. Never bake a single context-size literal into code or user-facing prose; the window is dynamic and must stay true if Apple changes it (#192, #330).
 - **Clean code, clean logic.** No hacks. Proper error types. Real token counts.
 - **Swift 6 strict concurrency.** No data races.
 - **Usable security.** Secure defaults that don't get in the way.

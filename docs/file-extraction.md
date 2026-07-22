@@ -56,8 +56,8 @@ apfel --count-tokens -f report.pdf "Summarize this"
 
 ## Honest limits
 
-- The on-device model has a small context window (about 4096 tokens). A large PDF can exceed
-  it; use `--count-tokens` to check.
+- The on-device model has a small context window (4096 tokens on macOS 26, 8192 on macOS 27 -
+  read at runtime). A large PDF can exceed it; use `--count-tokens` to check.
 - OCR quality depends on the image. Engraved, handwritten, or low-contrast text may come out
   partial. apfel reports what Vision actually read and never invents text.
 - Image classification labels are Vision's best guess. When nothing is confident, apfel says
